@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Manager - High Speed</title>
+    <title>Expense Manager Pro - High Speed</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <script src="https://unpkg.com/lucide@latest" crossorigin></script>
     
+    <!-- External Libraries for Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <!-- Firebase SDK Modules -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -18,20 +22,23 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Kanit:wght@300;400;600&display=swap');
         body { font-family: 'Kanit', 'Inter', sans-serif; background-color: #F2F2F7; margin: 0; padding: 0; }
-        .glass { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.4); }
-        .dark-glass { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.4); }
+        .dark-glass { background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
         .animate-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* Export Area Hidden */
+        #export-area { position: absolute; left: -9999px; top: 0; width: 400px; z-index: -100; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         // --- CONFIGURATION ---
-        // ใช้ค่าเดิมจาก Firebase Console ของคุณ
         const firebaseConfig = {
             apiKey: "AIzaSyCwnWHqG__ty3OvDok2o6orgreXOu5LSXk",
             authDomain: "expense-manager-14564.firebaseapp.com",
@@ -44,23 +51,38 @@
         
         const appId = "expense-manager-pro-v1";
 
-        // Initialize Firebase Safely
+        // Initialize Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        const partyEmojis = ['🍕', '🍣', '🍻', '✈️', '🍲', '☕', '🎳', '🛍️', '🎤', '🏖️', '⛰️', '🍱', '🍖', '🎮', '🚗', '🚢', '🥘', '🍿', '🎡'];
+
         function App() {
             const [user, setUser] = useState(null);
-            const [view, setView] = useState('list');
+            const [view, setView] = useState('list'); // 'list' or 'detail'
             const [groups, setGroups] = useState([]);
             const [activeGroup, setActiveGroup] = useState(null);
+            const [expenses, setExpenses] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+            const [exporting, setExporting] = useState(false);
+            
+            // Modal States
+            const [showAddGroup, setShowAddGroup] = useState(false);
+            const [showExpenseModal, setShowExpenseModal] = useState(false);
+            const [editingExpense, setEditingExpense] = useState(null);
+            
+            // Form States
             const [newGroupName, setNewGroupName] = useState('');
+            const [newMemberName, setNewMemberName] = useState('');
+            const [expDesc, setExpDesc] = useState('');
+            const [expAmount, setExpAmount] = useState('');
+            const [expPayer, setExpPayer] = useState('');
+            const [expParticipants, setExpParticipants] = useState([]);
 
-            // (1) Auth Effect
+            // (1) Auth
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
@@ -69,227 +91,403 @@
                 return () => unsubscribe();
             }, []);
 
-            // (2) Fetch Groups Effect (Real-time with Firestore)
+            // (2) Groups Listener
             useEffect(() => {
                 if (!user) return;
-                setLoading(true);
-
-                // Path: /artifacts/{appId}/public/data/groups
                 const groupsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
-                
-                // กรองเฉพาะกลุ่มที่ User เป็นเจ้าของ (Simple query)
-                const q = groupsRef.where("ownerId", "==", user.uid);
-
-                const unsubscribe = q.onSnapshot((snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const unsubscribe = groupsRef.where("ownerId", "==", user.uid).onSnapshot((snap) => {
+                    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setGroups(data);
                     setLoading(false);
-                    if (window.lucide) setTimeout(() => window.lucide.createIcons(), 100);
-                }, (err) => {
-                    console.error("Firestore error:", err);
-                    setLoading(false);
                 });
-
                 return () => unsubscribe();
             }, [user]);
 
-            // Icons initialization
+            // (3) Expenses Listener
             useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            });
+                if (!user || !activeGroup) return;
+                const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
+                const unsubscribe = expRef.orderBy("date", "desc").onSnapshot((snap) => {
+                    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setExpenses(data);
+                });
+                return () => unsubscribe();
+            }, [user, activeGroup]);
 
-            const handleGoogleLogin = async () => {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                try { await auth.signInWithPopup(provider); } catch (err) { alert(err.message); }
+            // Icons
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+
+            // Math Logic
+            const evaluateMath = (str) => {
+                try {
+                    const sanitized = str.toString().replace(/[^-+*/().0-9]/g, '');
+                    if (!sanitized) return 0;
+                    const res = new Function(`return ${sanitized}`)();
+                    return isNaN(res) ? 0 : res;
+                } catch (e) { return 0; }
             };
 
-            const handleLogout = () => auth.signOut();
+            const formatMoney = (val) => Number(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            // Handlers
+            const handleLogin = async () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithPopup(provider);
+            };
 
             const createGroup = async () => {
-                if (!newGroupName.trim() || !user) return;
-                setLoading(true);
-                try {
-                    const groupsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
-                    await groupsRef.add({
-                        name: newGroupName.trim(),
-                        ownerId: user.uid,
-                        ownerEmail: user.email,
-                        createdAt: Date.now(),
-                        members: [user.displayName || 'Me'],
-                        icon: '📊'
-                    });
-                    setNewGroupName('');
-                    setShowAddGroupModal(false);
-                } catch (err) {
-                    alert("ไม่สามารถสร้างกลุ่มได้: " + err.message);
-                } finally {
-                    setLoading(false);
-                }
+                if (!newGroupName.trim()) return;
+                const randomIcon = partyEmojis[Math.floor(Math.random() * partyEmojis.length)];
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').add({
+                    name: newGroupName.trim(),
+                    ownerId: user.uid,
+                    members: [user.displayName || 'Me'],
+                    icon: randomIcon,
+                    createdAt: Date.now()
+                });
+                setNewGroupName('');
+                setShowAddGroup(false);
             };
 
-            const deleteGroup = async (e, id) => {
-                e.stopPropagation();
-                if (!confirm("ลบกลุ่มนี้ใช่หรือไม่?")) return;
-                try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete();
-                } catch (err) {
-                    alert("ลบไม่สำเร็จ");
-                }
+            const addMember = async () => {
+                if (!newMemberName.trim() || activeGroup.members.includes(newMemberName.trim())) return;
+                const updatedMembers = [...activeGroup.members, newMemberName.trim()];
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
+                    members: updatedMembers
+                });
+                setActiveGroup({...activeGroup, members: updatedMembers});
+                setNewMemberName('');
             };
 
-            if (loading && !user) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center bg-[#F2F2F7]">
-                        <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-600 rounded-full animate-spin"></div>
-                    </div>
-                );
-            }
+            const removeMember = async (name) => {
+                if (!confirm(`ลบ ${name} ออกจากกลุ่ม?`)) return;
+                const updatedMembers = activeGroup.members.filter(m => m !== name);
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
+                    members: updatedMembers
+                });
+                setActiveGroup({...activeGroup, members: updatedMembers});
+            };
 
-            if (!user) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-[#F2F2F7]">
-                        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-400/10 blur-[120px] rounded-full"></div>
-                        <div className="max-w-md w-full relative z-10 animate-in">
-                            <div className="glass rounded-[3rem] p-10 shadow-2xl text-center border border-white/50">
-                                <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-400 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-blue-200">
-                                    <i data-lucide="zap" className="text-white w-10 h-10"></i>
-                                </div>
-                                <h1 className="text-3xl font-black text-slate-900 mb-2">High-Speed Expense</h1>
-                                <p className="text-slate-500 mb-10 font-medium leading-relaxed">ระบบจัดการค่าใช้จ่ายเวอร์ชันอัปเกรด <br/>ทำงานเร็วแบบ Real-time</p>
-                                <button 
-                                    onClick={handleGoogleLogin}
-                                    className="w-full flex items-center justify-center gap-4 bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-black transition-all shadow-xl active:scale-95"
-                                >
-                                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-1" alt="google" />
-                                    เข้าสู่ระบบด้วย Google
-                                </button>
-                                <p className="mt-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Powered by Firebase Firestore</p>
-                            </div>
+            const saveExpense = async () => {
+                const amount = evaluateMath(expAmount);
+                if (!expDesc || amount <= 0 || !expPayer || expParticipants.length === 0) return;
+                
+                const expData = {
+                    description: expDesc,
+                    amount: amount,
+                    payer: expPayer,
+                    participants: expParticipants,
+                    date: editingExpense ? editingExpense.date : Date.now()
+                };
+
+                const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
+                
+                if (editingExpense) {
+                    await ref.doc(editingExpense.id).update(expData);
+                } else {
+                    await ref.add(expData);
+                }
+
+                setShowExpenseModal(false);
+                setEditingExpense(null);
+                setExpDesc('');
+                setExpAmount('');
+            };
+
+            const deleteExpense = async (id) => {
+                if (!confirm("ลบรายการนี้ใช่หรือไม่?")) return;
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
+            };
+
+            // Calculations
+            const totalSpent = useMemo(() => expenses.reduce((sum, e) => sum + e.amount, 0), [expenses]);
+
+            const settlements = useMemo(() => {
+                if (!activeGroup || activeGroup.members.length < 2) return [];
+                const balances = {};
+                activeGroup.members.forEach(m => balances[m] = 0);
+                expenses.forEach(e => {
+                    const share = e.amount / e.participants.length;
+                    balances[e.payer] += e.amount;
+                    e.participants.forEach(p => { if (balances.hasOwnProperty(p)) balances[p] -= share; });
+                });
+                const creditors = [], debtors = [];
+                Object.keys(balances).forEach(n => {
+                    if (balances[n] > 0.01) creditors.push({name: n, amt: balances[n]});
+                    else if (balances[n] < -0.01) debtors.push({name: n, amt: Math.abs(balances[n])});
+                });
+                const res = []; let i = 0, j = 0;
+                while (i < debtors.length && j < creditors.length) {
+                    const pay = Math.min(debtors[i].amt, creditors[j].amt);
+                    res.push({ from: debtors[i].name, to: creditors[j].name, amount: pay });
+                    debtors[i].amt -= pay; creditors[j].amt -= pay;
+                    if (debtors[i].amt < 0.01) i++; if (creditors[j].amt < 0.01) j++;
+                }
+                return res;
+            }, [activeGroup, expenses]);
+
+            // Export Functions
+            const exportImage = async () => {
+                setExporting(true);
+                const element = document.getElementById('export-area');
+                element.style.position = "static";
+                element.style.left = "0";
+                const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#F2F2F7' });
+                element.style.position = "absolute";
+                element.style.left = "-9999px";
+                const link = document.createElement('a');
+                link.download = `Summary_${activeGroup.name}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                setExporting(false);
+            };
+
+            const exportExcel = () => {
+                const data = [
+                    ["กลุ่ม:", activeGroup.name],
+                    ["ยอดรวม:", totalSpent],
+                    [],
+                    ["--- รายการ ---"],
+                    ["รายการ", "เงิน", "คนจ่าย", "คนหาร"],
+                    ...expenses.map(e => [e.description, e.amount, e.payer, e.participants.join(', ')]),
+                    [],
+                    ["--- สรุปหนี้ ---"],
+                    ["จาก", "ไปหา", "ยอด"]
+                ];
+                settlements.forEach(s => data.push([s.from, s.to, s.amount]));
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Summary");
+                XLSX.writeFile(wb, `${activeGroup.name}_Expenses.xlsx`);
+            };
+
+            if (loading && !user) return <div className="h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
+
+            if (!user) return (
+                <div className="h-screen flex items-center justify-center p-6 bg-[#F2F2F7]">
+                    <div className="glass p-10 rounded-[3rem] shadow-2xl text-center max-w-sm w-full border border-white">
+                        <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-blue-100">
+                            <i data-lucide="calculator" className="text-white w-10 h-10"></i>
                         </div>
+                        <h1 className="text-3xl font-black mb-2">Expense Pro</h1>
+                        <p className="text-slate-500 mb-10">จัดการค่าใช้จ่ายกลุ่มเพื่อนแบบมืออาชีพ</p>
+                        <button onClick={handleLogin} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-black transition-all active:scale-95 shadow-lg">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" />
+                            เข้าสู่ระบบด้วย Google
+                        </button>
                     </div>
-                );
-            }
+                </div>
+            );
 
             return (
-                <div className="min-h-screen text-slate-900 pb-24">
-                    <header className="sticky top-0 z-50 px-4 pt-6">
-                        <div className="max-w-4xl mx-auto">
-                            <div className="glass rounded-3xl px-6 py-4 flex items-center justify-between shadow-sm border border-white/60">
-                                <div className="flex flex-col">
-                                    <h1 className="text-lg font-black tracking-tight">{view === 'list' ? 'Dashboard' : activeGroup?.name}</h1>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">System Online</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="text-right hidden sm:block">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">User Profile</p>
-                                        <p className="text-xs font-bold leading-none">{user.displayName}</p>
-                                    </div>
-                                    <button onClick={handleLogout} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white shadow-md active:scale-90 transition-transform">
-                                        <img src={user.photoURL} alt="profile" />
-                                    </button>
-                                </div>
+                <div className="min-h-screen bg-[#F2F2F7] pb-32">
+                    {/* Header */}
+                    <header className="sticky top-0 z-40 p-4 sm:p-6">
+                        <div className="max-w-4xl mx-auto flex items-center justify-between glass rounded-3xl px-6 py-4 shadow-sm border border-white">
+                            <div className="flex items-center gap-3">
+                                {view === 'detail' && <button onClick={() => setView('list')} className="p-2 bg-slate-100 rounded-full"><i data-lucide="chevron-left" className="w-5 h-5"></i></button>}
+                                <h1 className="text-xl font-black">{view === 'list' ? 'Dashboard' : activeGroup?.name}</h1>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-slate-500 hidden sm:block">{user.displayName}</span>
+                                <img src={user.photoURL} className="w-10 h-10 rounded-xl border-2 border-white shadow-sm" />
                             </div>
                         </div>
                     </header>
 
-                    <main className="max-w-4xl mx-auto p-4 space-y-6 mt-4">
+                    <main className="max-w-4xl mx-auto p-4 space-y-6">
                         {view === 'list' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in">
-                                {groups.map(group => (
-                                    <div 
-                                        key={group.id} 
-                                        onClick={() => { setActiveGroup(group); setView('detail'); }}
-                                        className="bg-white/70 border border-white/60 p-8 rounded-[2.5rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer relative group"
-                                    >
-                                        <button 
-                                            onClick={(e) => deleteGroup(e, group.id)}
-                                            className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                        </button>
-                                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl mb-4 shadow-sm border border-slate-50 group-hover:scale-110 transition-transform">
-                                            {group.icon || '📊'}
-                                        </div>
-                                        <h3 className="text-xl font-black text-slate-800 leading-tight">{group.name}</h3>
-                                        <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider flex items-center gap-2">
-                                            <i data-lucide="users" className="w-3 h-3"></i> {group.members?.length || 0} Members
-                                        </p>
+                                {groups.map(g => (
+                                    <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass p-8 rounded-[2.5rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer border border-white relative group">
+                                        <div className="text-4xl mb-4">{g.icon || '📊'}</div>
+                                        <h3 className="text-2xl font-black text-slate-800">{g.name}</h3>
+                                        <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">{g.members.length} Members</p>
                                     </div>
                                 ))}
-                                <div 
-                                    onClick={() => setShowAddGroupModal(true)}
-                                    className="border-2 border-dashed border-slate-300 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-500 hover:bg-white transition-all cursor-pointer"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:bg-blue-100">
-                                        <i data-lucide="plus" className="w-6 h-6"></i>
-                                    </div>
+                                <button onClick={() => setShowAddGroup(true)} className="border-2 border-dashed border-slate-300 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-slate-400 hover:bg-white hover:text-blue-600 hover:border-blue-600 transition-all">
+                                    <i data-lucide="plus" className="w-8 h-8 mb-2"></i>
                                     <span className="font-bold">สร้างกลุ่มใหม่</span>
-                                </div>
+                                </button>
                             </div>
                         ) : (
-                            <div className="text-center py-20 animate-in">
-                                <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <i data-lucide="pie-chart" className="w-12 h-12 text-blue-500"></i>
+                            <div className="space-y-6 animate-in">
+                                {/* Stats & Members */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="md:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
+                                        <div className="relative z-10">
+                                            <p className="text-blue-400 text-xs font-bold uppercase tracking-widest mb-1">ยอดรวมค่าใช้จ่าย</p>
+                                            <h2 className="text-4xl font-black">฿{formatMoney(totalSpent)}</h2>
+                                            <div className="flex gap-2 mt-6">
+                                                {activeGroup.members.map(m => (
+                                                    <div key={m} className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold">{m}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <i data-lucide="trending-up" className="absolute -bottom-10 -right-10 w-48 h-48 opacity-10"></i>
+                                    </div>
+                                    <div className="glass p-8 rounded-[2.5rem] border border-white flex flex-col justify-center">
+                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">สมาชิก ({activeGroup.members.length})</h4>
+                                        <div className="space-y-2 mb-4">
+                                            {activeGroup.members.map(m => (
+                                                <div key={m} className="flex items-center justify-between group/m">
+                                                    <span className="font-bold text-sm">{m}</span>
+                                                    <button onClick={() => removeMember(m)} className="text-red-300 hover:text-red-500 opacity-0 group-hover/m:opacity-100 transition-opacity"><i data-lucide="x" className="w-3 h-3"></i></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="เพิ่มชื่อ..." className="w-full bg-slate-100 px-3 py-2 rounded-xl outline-none text-xs font-bold" />
+                                            <button onClick={addMember} className="bg-blue-600 text-white p-2 rounded-xl"><i data-lucide="plus" className="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <h2 className="text-2xl font-black">{activeGroup?.name}</h2>
-                                <p className="text-slate-500 mt-2 font-medium">ฟังก์ชันจดบิลใน Firestore ทำงานเร็วและ Real-time <br/>คุณสามารถเพิ่มรายการได้ทันที</p>
-                                <button onClick={() => setView('list')} className="mt-8 bg-white px-6 py-2 rounded-xl border border-slate-200 font-bold shadow-sm hover:bg-slate-50 transition-colors inline-flex items-center gap-2">
-                                    <i data-lucide="chevron-left" className="w-4 h-4"></i> กลับหน้าหลัก
-                                </button>
+
+                                {/* Settlements */}
+                                <div className="glass p-8 rounded-[3rem] border border-white shadow-sm">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-xl font-black flex items-center gap-2"><i data-lucide="arrow-right-left" className="text-blue-500 w-5 h-5"></i> สรุปหนี้ค้างชำระ</h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={exportImage} className="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="image" className="w-5 h-5"></i></button>
+                                            <button onClick={exportExcel} className="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="file-spreadsheet" className="w-5 h-5"></i></button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {settlements.map((s, i) => (
+                                            <div key={i} className="flex items-center justify-between bg-white/40 p-4 rounded-2xl border border-white">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-black text-slate-800">{s.from}</span>
+                                                    <span className="text-slate-300">➜</span>
+                                                    <span className="font-black text-slate-800">{s.to}</span>
+                                                </div>
+                                                <span className="text-lg font-black text-blue-600">฿{formatMoney(s.amount)}</span>
+                                            </div>
+                                        ))}
+                                        {settlements.length === 0 && <p className="text-center text-slate-400 italic py-4">ไม่มีหนี้ค้างชำระ สบายใจได้!</p>}
+                                    </div>
+                                </div>
+
+                                {/* Expenses List */}
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-xl font-black">ประวัติการจ่าย</h3>
+                                        <button onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer(activeGroup.members[0]); setExpParticipants(activeGroup.members); setShowExpenseModal(true); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all">+ เพิ่มบิล</button>
+                                    </div>
+                                    {expenses.map(e => (
+                                        <div key={e.id} className="glass p-6 rounded-3xl flex items-center justify-between group hover:border-blue-300 transition-all border border-white">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-inner">{activeGroup.members.indexOf(e.payer) % 2 === 0 ? '💰' : '💳'}</div>
+                                                <div>
+                                                    <h4 className="font-black text-slate-800">{e.description}</h4>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">จ่ายโดย {e.payer} • {e.participants.length} คนหาร</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <p className="text-xl font-black">฿{formatMoney(e.amount)}</p>
+                                                    <div className="flex justify-end -space-x-1 mt-1">
+                                                        {e.participants.slice(0,3).map(p => <div key={p} className="w-4 h-4 rounded-full bg-slate-200 border border-white text-[6px] flex items-center justify-center font-bold">{p[0]}</div>)}
+                                                        {e.participants.length > 3 && <div className="w-4 h-4 rounded-full bg-slate-300 border border-white text-[6px] flex items-center justify-center font-bold">+{e.participants.length-3}</div>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-1 hover:text-blue-500"><i data-lucide="edit-3" className="w-4 h-4"></i></button>
+                                                    <button onClick={() => deleteExpense(e.id)} className="p-1 hover:text-red-500"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </main>
 
-                    {/* Bottom Nav */}
+                    {/* Navbar */}
                     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50">
-                        <div className="dark-glass rounded-[2rem] px-8 py-4 flex items-center justify-between shadow-2xl shadow-blue-900/20">
-                            <div className={`p-2 cursor-pointer transition-colors ${view === 'list' ? 'text-white' : 'text-slate-500'}`} onClick={() => setView('list')}>
-                                <i data-lucide="layout-grid" className="w-6 h-6"></i>
-                            </div>
-                            <div 
-                                onClick={() => setShowAddGroupModal(true)}
-                                className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg -mt-12 border-4 border-[#F2F2F7] cursor-pointer hover:bg-blue-500 active:scale-90 transition-all"
-                            >
+                        <div className="dark-glass rounded-[2rem] px-8 py-4 flex items-center justify-between shadow-2xl">
+                            <i data-lucide="layout-grid" className={`w-6 h-6 cursor-pointer ${view === 'list' ? 'text-white' : 'text-slate-500'}`} onClick={() => setView('list')}></i>
+                            <div onClick={() => setShowAddGroup(true)} className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg -mt-12 border-4 border-[#F2F2F7] active:scale-90 transition-all cursor-pointer">
                                 <i data-lucide="plus" className="w-6 h-6 text-white"></i>
                             </div>
-                            <div className="p-2 cursor-pointer text-slate-500 hover:text-white transition-colors">
-                                <i data-lucide="settings" className="w-6 h-6"></i>
-                            </div>
+                            <i data-lucide="settings" className="w-6 h-6 text-slate-500"></i>
                         </div>
                     </nav>
 
-                    {/* Modal */}
-                    {showAddGroupModal && (
+                    {/* Add Group Modal */}
+                    {showAddGroup && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md animate-in">
-                            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 shadow-2xl border border-white">
-                                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 mx-auto">
-                                    <i data-lucide="users" className="w-8 h-8 text-blue-600"></i>
+                            <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 shadow-2xl border border-white">
+                                <h3 className="text-2xl font-black mb-6 text-center">ชื่อกลุ่มใหม่</h3>
+                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="เช่น ทริปสงกรานต์..." className="w-full bg-slate-50 border border-slate-200 px-6 py-4 rounded-2xl outline-none focus:ring-4 ring-blue-500/10 font-bold mb-6 text-lg" />
+                                <button onClick={createGroup} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all">สร้างกลุ่มทันที</button>
+                                <button onClick={() => setShowAddGroup(false)} className="w-full mt-4 text-slate-400 font-bold">ยกเลิก</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Expense Modal */}
+                    {showExpenseModal && (
+                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/40 backdrop-blur-md animate-in">
+                            <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-8 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-2xl font-black">{editingExpense ? 'แก้ไขบิล' : 'เพิ่มรายการใหม่'}</h3>
+                                    <button onClick={() => setShowExpenseModal(false)} className="p-2"><i data-lucide="x" className="w-6 h-6"></i></button>
                                 </div>
-                                <h3 className="text-2xl font-black mb-2 text-center">ชื่อกลุ่มใหม่</h3>
-                                <p className="text-center text-slate-400 text-sm mb-6">ระบุชื่อทริปหรือกลุ่มเพื่อนที่คุณต้องการ</p>
-                                <input 
-                                    autoFocus
-                                    value={newGroupName}
-                                    onChange={(e) => setNewGroupName(e.target.value)}
-                                    placeholder="เช่น ทริปเที่ยวทะเล, ค่าบ้าน..."
-                                    className="w-full bg-slate-50 border border-slate-200 px-6 py-4 rounded-2xl outline-none focus:ring-4 ring-blue-500/10 font-bold mb-6 text-lg"
-                                />
-                                <div className="flex flex-col gap-2">
-                                    <button 
-                                        onClick={createGroup}
-                                        disabled={loading || !newGroupName.trim()}
-                                        className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 disabled:opacity-50 transition-all"
-                                    >
-                                        {loading ? 'กำลังบันทึก...' : 'สร้างกลุ่มทันที'}
-                                    </button>
-                                    <button onClick={() => setShowAddGroupModal(false)} className="w-full py-2 text-slate-400 font-bold hover:text-slate-600">ยกเลิก</button>
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">จ่ายค่าอะไร?</label>
+                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าข้าว, ค่าเรือ..." className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 font-bold" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">จำนวนเงิน (฿) คำนวณได้</label>
+                                        <div className="relative">
+                                            <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0" className="w-full bg-slate-50 px-4 py-4 rounded-xl border border-slate-200 font-black text-2xl text-blue-600 pr-24" />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 bg-white px-2 py-1 rounded shadow-sm border">= ฿{formatMoney(evaluateMath(expAmount))}</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">ใครเปย์?</label>
+                                            <select value={expPayer} onChange={e => setExpPayer(e.target.value)} className="w-full bg-slate-50 px-3 py-3 rounded-xl border border-slate-200 font-bold">
+                                                {activeGroup.members.map(m => <option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">ตัวช่วย</label>
+                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="w-full bg-blue-50 text-blue-600 px-3 py-3 rounded-xl border border-blue-100 font-bold text-xs uppercase">หารทุกคน</button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">หารกับใครบ้าง?</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {activeGroup.members.map(m => (
+                                                <button key={m} onClick={() => expParticipants.includes(m) ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])} className={`px-4 py-3 rounded-xl font-bold border transition-all ${expParticipants.includes(m) ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100' : 'bg-white border-slate-100 text-slate-500'}`}>{m}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={saveExpense} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-lg shadow-xl active:scale-95 transition-all mt-4">บันทึกรายการ</button>
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {/* Export Area Container (Hidden for real use) */}
+                    <div id="export-area" className="p-10 bg-[#F2F2F7]">
+                        <div className="glass p-8 rounded-[3rem] border border-white shadow-lg text-center">
+                            <h1 className="text-3xl font-black mb-1">{activeGroup?.name}</h1>
+                            <p className="text-blue-600 font-bold mb-8">ค่าใช้จ่ายรวม: ฿{formatMoney(totalSpent)}</p>
+                            <div className="text-left space-y-4">
+                                <h3 className="font-black border-l-4 border-blue-500 pl-3">💸 สรุปดีลหนี้เพื่อนรัก</h3>
+                                {settlements.map((s, i) => (
+                                    <div key={i} className="flex justify-between bg-white/50 p-4 rounded-2xl">
+                                        <span className="font-bold">{s.from} ➜ {s.to}</span>
+                                        <span className="font-black text-blue-600">฿{formatMoney(s.amount)}</span>
+                                    </div>
+                                ))}
+                                <p className="text-[10px] text-center text-slate-400 mt-10 italic">Summary by Expense Pro Manager</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
         }
