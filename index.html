@@ -85,7 +85,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Export area hidden from view but used for snapshot */
         #export-area { position: absolute; left: -9999px; top: 0; width: 400px; }
     </style>
 </head>
@@ -138,7 +137,7 @@
             const [expPayer, setExpPayer] = useState('');
             const [expParticipants, setExpParticipants] = useState([]);
 
-            // Rule 3: Auth FIRST
+            // Rule 3: Auth FIRST and Await it
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -159,7 +158,8 @@
                 return () => unsubscribe();
             }, []);
 
-            // Listen to groups - Rule 1: Strict Paths
+            // Rule 1: Strict Paths - Always use artifacts/appId/public/data
+            // Rule 2: No Complex Queries - Fetch all and filter in memory
             useEffect(() => {
                 if (!user) return;
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
@@ -167,28 +167,35 @@
                 
                 const unsubscribe = groupsRef.onSnapshot((snap) => {
                     const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Rule 2: Memory filter
-                    const myGroups = data.filter(g => g.ownerId === user.uid || g.members.includes(myName));
+                    // Filtering and sorting in memory as per Rule 2
+                    const myGroups = data
+                        .filter(g => g.ownerId === user.uid || g.members.includes(myName))
+                        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    
                     setGroups(myGroups);
                     
                     if (activeGroup) {
                         const updated = myGroups.find(g => g.id === activeGroup.id);
                         if (updated) setActiveGroup(updated);
                     }
-                }, (err) => console.error("Firestore Error:", err));
+                }, (err) => {
+                    console.error("Firestore Groups Error:", err);
+                });
                 
                 return () => unsubscribe();
             }, [user, activeGroup?.id]);
 
-            // Listen to expenses
             useEffect(() => {
                 if (!user || !activeGroup) return;
                 const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
                 
                 const unsubscribe = expRef.onSnapshot((snap) => {
                     const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // Sorting in memory
                     setExpenses(list.sort((a, b) => b.date - a.date));
-                }, (err) => console.error(err));
+                }, (err) => {
+                    console.error("Firestore Expenses Error:", err);
+                });
 
                 return () => unsubscribe();
             }, [user, activeGroup?.id]);
@@ -234,6 +241,8 @@
                 if (!newGroupName.trim() || !user) return;
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                 try {
+                    // Rule 1: Always guard with auth check
+                    if (!auth.currentUser) return;
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').add({
                         name: newGroupName.trim(),
                         ownerId: user.uid,
@@ -249,6 +258,7 @@
             const joinGroup = async () => {
                 if (!joinId.trim() || !user) return;
                 try {
+                    if (!auth.currentUser) return;
                     const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                     const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim());
                     const doc = await groupRef.get();
@@ -267,12 +277,14 @@
 
             const deleteGroup = async (id, e) => {
                 e.stopPropagation();
+                if (!auth.currentUser) return;
                 if (confirm("ต้องการลบกลุ่มและข้อมูลทั้งหมดถาวรหรือไม่?")) {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete();
                 }
             };
 
             const addMember = async () => {
+                if (!auth.currentUser || !activeGroup) return;
                 if (!newMemberName.trim() || activeGroup.members.includes(newMemberName.trim())) return;
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
                     members: firebase.firestore.FieldValue.arrayUnion(newMemberName.trim())
@@ -281,6 +293,7 @@
             };
 
             const removeMember = async (name) => {
+                if (!auth.currentUser || !activeGroup) return;
                 if (confirm(`ลบ ${name} ออกจากกลุ่ม?`)) {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
                         members: firebase.firestore.FieldValue.arrayRemove(name)
@@ -289,8 +302,9 @@
             };
 
             const saveExpense = async () => {
+                if (!auth.currentUser || !activeGroup) return;
                 const amount = evaluateMath(expAmount);
-                if (!expDesc || amount <= 0 || !expPayer || !activeGroup) return;
+                if (!expDesc || amount <= 0 || !expPayer) return;
                 
                 const data = {
                     description: expDesc, amount, payer: expPayer, participants: expParticipants,
@@ -306,12 +320,12 @@
             };
 
             const deleteExpense = async (id) => {
+                if (!auth.currentUser || !activeGroup) return;
                 if (confirm("ลบรายการนี้ใช่หรือไม่?")) {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
                 }
             };
 
-            // Exports
             const exportImage = async () => {
                 setExporting(true);
                 const element = document.getElementById('export-area');
