@@ -74,7 +74,7 @@
         const { useState, useEffect, useMemo } = React;
 
         // --- CONFIGURATION ---
-        const apiKey = ""; // Runtime provides the key
+        const apiKey = "AIzaSyANUCE14o9FcJfE7CUS_B69mgyoT6Z6NSg"; 
         const firebaseConfig = {
             apiKey: "AIzaSyCwnWHqG__ty3OvDok2o6orgreXOu5LSXk",
             authDomain: "expense-manager-14564.firebaseapp.com",
@@ -109,13 +109,11 @@
             const [exporting, setExporting] = useState(false);
             const [appLogo, setAppLogo] = useState(null);
             
-            // Modal States
             const [showAddGroup, setShowAddGroup] = useState(false);
             const [showEditGroup, setShowEditGroup] = useState(false);
             const [showExpenseModal, setShowExpenseModal] = useState(false);
             const [editingExpense, setEditingExpense] = useState(null);
             
-            // Form States
             const [newGroupName, setNewGroupName] = useState('');
             const [editGroupName, setEditGroupName] = useState('');
             const [newMemberName, setNewMemberName] = useState('');
@@ -124,6 +122,7 @@
             const [expPayer, setExpPayer] = useState('');
             const [expParticipants, setExpParticipants] = useState([]);
             const [isGenerating, setIsGenerating] = useState(false);
+            const [isGeneratingGroupImage, setIsGeneratingGroupImage] = useState(false);
 
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((u) => {
@@ -133,15 +132,13 @@
                 return () => unsubscribe();
             }, []);
 
-            // Generate App Logo on mount
             useEffect(() => {
                 const loadLogo = async () => {
+                    if (!apiKey) return;
                     try {
                         const logo = await generateAIImage("A very cute 3D pastel pink bear holding a wallet and coins, smiling, clay style, soft lighting, white background");
                         setAppLogo(logo);
-                    } catch (e) {
-                        setAppLogo(null);
-                    }
+                    } catch (e) { console.error(e); }
                 };
                 loadLogo();
             }, []);
@@ -150,10 +147,15 @@
                 if (!user) return;
                 const groupsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
                 return groupsRef.where("ownerId", "==", user.uid).onSnapshot((snap) => {
-                    setGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setGroups(data);
+                    if (activeGroup) {
+                        const updated = data.find(g => g.id === activeGroup.id);
+                        if (updated) setActiveGroup(updated);
+                    }
                     setLoading(false);
                 });
-            }, [user]);
+            }, [user, activeGroup?.id]);
 
             useEffect(() => {
                 if (!user || !activeGroup) return;
@@ -161,28 +163,33 @@
                 return expRef.orderBy("date", "desc").onSnapshot((snap) => {
                     setExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 });
-            }, [user, activeGroup]);
+            }, [user, activeGroup?.id]);
 
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
 
-            // AI Image Generation Function
             const generateAIImage = async (promptText) => {
-                const prompt = `A cute 3D pastel style square icon illustrating: ${promptText}. soft lighting, clay style, simple objects, high quality, professional design, white background`;
+                if (!apiKey) throw new Error("Missing API Key.");
+                const prompt = `A single, high-quality 3D pastel clay icon representing: ${promptText}. cute aesthetic, soft studio lighting, clean white background, high detail, professional art style, isometric view`;
+                
                 let delay = 1000;
-                for (let i = 0; i < 5; i++) {
+                for (let i = 0; i < 3; i++) {
                     try {
                         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
                             method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 instances: [{ prompt: prompt }],
                                 parameters: { sampleCount: 1 }
                             })
                         });
-                        if (response.status === 429) throw new Error('Rate limit');
+                        if (!response.ok) throw new Error("Generation failed");
                         const result = await response.json();
-                        return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        if (result.predictions && result.predictions[0]) {
+                            return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        }
+                        throw new Error("No image in response");
                     } catch (err) {
-                        if (i === 4) throw err;
+                        if (i === 2) throw err;
                         await new Promise(r => setTimeout(r, delay));
                         delay *= 2;
                     }
@@ -194,8 +201,7 @@
                 for (let i = 0; i < name.length; i++) {
                     hash = name.charCodeAt(i) + ((hash << 5) - hash);
                 }
-                const index = Math.abs(hash) % memberColors.length;
-                return memberColors[index];
+                return memberColors[Math.abs(hash) % memberColors.length];
             };
 
             const evaluateMath = (str) => {
@@ -211,11 +217,8 @@
 
             const formatDate = (timestamp) => {
                 return new Intl.DateTimeFormat('th-TH', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
                 }).format(new Date(timestamp));
             };
 
@@ -231,14 +234,12 @@
             const createGroup = async () => {
                 if (!newGroupName.trim()) return;
                 setIsGenerating(true);
+                let aiImageUrl = null;
                 try {
-                    let aiImageUrl = null;
-                    try {
-                        aiImageUrl = await generateAIImage(newGroupName.trim());
-                    } catch (e) {
-                        console.error("AI Generation failed", e);
-                    }
+                    if (apiKey) aiImageUrl = await generateAIImage(newGroupName.trim());
+                } catch (e) { console.error("AI Generation failed", e.message); }
 
+                try {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').add({
                         name: newGroupName.trim(),
                         ownerId: user.uid,
@@ -249,9 +250,24 @@
                     setNewGroupName('');
                     setShowAddGroup(false);
                 } catch (err) {
-                    alert("ขออภัยจ้า สร้างกลุ่มไม่สำเร็จ: " + err.message);
+                    alert("สร้างกลุ่มไม่สำเร็จ: " + err.message);
                 } finally {
                     setIsGenerating(false);
+                }
+            };
+
+            const regenerateGroupImage = async () => {
+                if (!activeGroup || !apiKey) return;
+                setIsGeneratingGroupImage(true);
+                try {
+                    const aiImageUrl = await generateAIImage(activeGroup.name);
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
+                        imageUrl: aiImageUrl
+                    });
+                } catch (e) {
+                    alert("AI วาดรูปไม่สำเร็จ: " + e.message);
+                } finally {
+                    setIsGeneratingGroupImage(false);
                 }
             };
 
@@ -260,7 +276,6 @@
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
                     name: editGroupName.trim()
                 });
-                setActiveGroup({...activeGroup, name: editGroupName.trim()});
                 setShowEditGroup(false);
             };
 
@@ -274,7 +289,6 @@
                 if (!newMemberName.trim() || activeGroup.members.includes(newMemberName.trim())) return;
                 const updatedMembers = [...activeGroup.members, newMemberName.trim()];
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: updatedMembers });
-                setActiveGroup({...activeGroup, members: updatedMembers});
                 setNewMemberName('');
             };
 
@@ -282,17 +296,13 @@
                 if (!confirm(`ลบ ${name} ออกจากกลุ่ม?`)) return;
                 const updatedMembers = activeGroup.members.filter(m => m !== name);
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: updatedMembers });
-                setActiveGroup({...activeGroup, members: updatedMembers});
             };
 
             const saveExpense = async () => {
                 const amount = evaluateMath(expAmount);
                 if (!expDesc || amount <= 0 || !expPayer || expParticipants.length === 0) return;
                 const expData = {
-                    description: expDesc,
-                    amount: amount,
-                    payer: expPayer,
-                    participants: expParticipants,
+                    description: expDesc, amount: amount, payer: expPayer, participants: expParticipants,
                     date: editingExpense ? editingExpense.date : Date.now()
                 };
                 const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
@@ -329,8 +339,8 @@
                 while (i < debtors.length && j < creditors.length) {
                     const pay = Math.min(debtors[i].amt, creditors[j].amt);
                     res.push({ from: debtors[i].name, to: creditors[j].name, amount: pay });
-                    debtors[i].amt -= pay; debtors[i].amt = Math.max(0, debtors[i].amt);
-                    creditors[j].amt -= pay; creditors[j].amt = Math.max(0, creditors[j].amt);
+                    debtors[i].amt -= pay;
+                    creditors[j].amt -= pay;
                     if (debtors[i].amt < 0.01) i++; if (creditors[j].amt < 0.01) j++;
                 }
                 return res;
@@ -361,7 +371,7 @@
             };
 
             const Avatar = ({ name, size = "md" }) => {
-                const sizeClasses = { sm: "w-6 h-6 text-[8px]", md: "w-10 h-10 text-[14px]", lg: "w-14 h-14 text-[20px]" };
+                const sizeClasses = { sm: "w-7 h-7 text-[10px]", md: "w-11 h-11 text-[16px]", lg: "w-16 h-16 text-[22px]" };
                 return (
                     <div style={{ backgroundColor: getMemberColor(name) }} className={`${sizeClasses[size]} rounded-2xl flex items-center justify-center font-bold text-[#232946] border-2 border-white shadow-sm shrink-0`}>
                         {name[0].toUpperCase()}
@@ -376,15 +386,11 @@
                     <div className="glass-card p-10 text-center max-w-sm w-full border-4 border-white animate-pop shadow-2xl relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FFADAD] via-[#FDFFB6] to-[#9BF6FF]"></div>
                         <div className="w-40 h-40 bg-white rounded-[3rem] flex items-center justify-center mx-auto mb-8 shadow-xl overflow-hidden border-4 border-[#FDFBF9]">
-                            {appLogo ? (
-                                <img src={appLogo} className="w-full h-full object-cover animate-pop" alt="App Logo" />
-                            ) : (
-                                <span className="text-5xl animate-pulse">🧸</span>
-                            )}
+                            {appLogo ? <img src={appLogo} className="w-full h-full object-cover animate-pop" alt="App Logo" /> : <span className="text-5xl animate-pulse">🧸</span>}
                         </div>
                         <h1 className="text-4xl font-bold mb-2 text-[#232946]">หารเงินกับเพื่อน</h1>
                         <p className="text-slate-500 mb-10 font-medium">จัดการค่าใช้จ่ายกลุ่มแบบ 3D พาสเทล ✨</p>
-                        <button onClick={handleLogin} className="w-full py-5 bg-[#EEBBC3] text-[#232946] rounded-3xl font-bold flex items-center justify-center gap-3 hover:bg-[#e8a9b4] transition-all btn-glow shadow-lg border-b-4 border-[#d69fa8] group">
+                        <button onClick={handleLogin} className="w-full py-5 bg-[#EEBBC3] text-[#232946] rounded-3xl font-bold flex items-center justify-center gap-3 hover:bg-[#e8a9b4] transition-all btn-glow shadow-lg border-b-4 border-[#d69fa8] group text-lg">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 bg-white rounded-full p-1 group-hover:rotate-12 transition-transform" />
                             เข้าใช้งานด้วย Google
                         </button>
@@ -394,43 +400,39 @@
 
             return (
                 <div className="min-h-screen pb-12">
-                    {/* Header */}
-                    <header className="p-4 sm:p-6 sticky top-0 z-40">
-                        <div className="max-w-4xl mx-auto glass-card px-6 py-4 flex items-center justify-between border-2 border-white shadow-lg">
-                            <div className="flex items-center gap-3">
+                    {/* Header: Increased height and padding for Thai font marks */}
+                    <header className="p-4 sm:p-8 sticky top-0 z-40">
+                        <div className="max-w-4xl mx-auto glass-card px-8 py-6 sm:py-7 flex items-center justify-between border-2 border-white shadow-lg">
+                            <div className="flex items-center gap-4">
                                 {view === 'detail' && (
                                     <button onClick={() => setView('list')} className="p-2 bg-[#FDFBF9] hover:bg-[#B8C1EC]/20 rounded-full transition-colors">
-                                        <i data-lucide="chevron-left" className="w-5 h-5 text-[#232946]"></i>
+                                        <i data-lucide="chevron-left" className="w-6 h-6 text-[#232946]"></i>
                                     </button>
                                 )}
                                 <div className="flex flex-col">
-                                    <h1 className="text-2xl font-bold text-[#232946] truncate max-w-[150px] sm:max-w-none leading-none mb-1">
+                                    <h1 className="text-2xl sm:text-3xl font-bold text-[#232946] truncate max-w-[150px] sm:max-w-none leading-relaxed">
                                         {view === 'list' ? 'ตี้ของฉัน' : activeGroup?.name}
                                     </h1>
-                                    <div className="flex items-center gap-1">
-                                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Real-time Cloud</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Real-time Cloud Sync</span>
                                     </div>
                                 </div>
                                 {view === 'detail' && (
-                                    <button onClick={() => { setEditGroupName(activeGroup.name); setShowEditGroup(true); }} className="p-1.5 text-slate-300 hover:text-blue-400 transition-colors"><i data-lucide="edit-2" className="w-4 h-4"></i></button>
+                                    <button onClick={() => { setEditGroupName(activeGroup.name); setShowEditGroup(true); }} className="p-2 text-slate-300 hover:text-blue-400 transition-colors"><i data-lucide="edit-2" className="w-5 h-5"></i></button>
                                 )}
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-5">
                                 <div className="text-right hidden sm:block">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">สวัสดีจ้า</p>
-                                    <p className="text-sm font-bold text-[#232946]">{user.displayName.split(' ')[0]}</p>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">สวัสดีจ้า</p>
+                                    <p className="text-base font-bold text-[#232946]">{user.displayName.split(' ')[0]}</p>
                                 </div>
                                 <div className="relative group">
-                                    <div className="w-11 h-11 rounded-2xl border-2 border-white shadow-md overflow-hidden bg-white">
+                                    <div className="w-12 h-12 rounded-2xl border-2 border-white shadow-md overflow-hidden bg-white">
                                         <img src={user.photoURL} className="w-full h-full object-cover" />
                                     </div>
-                                    <button 
-                                        onClick={handleLogout}
-                                        className="absolute -top-2 -right-2 bg-red-400 text-white p-1.5 rounded-full border-2 border-white shadow-md hover:bg-red-500 transition-colors"
-                                        title="ออกจากระบบ"
-                                    >
-                                        <i data-lucide="log-out" className="w-3 h-3"></i>
+                                    <button onClick={handleLogout} className="absolute -top-2 -right-2 bg-red-400 text-white p-2 rounded-full border-2 border-white shadow-md hover:bg-red-500 transition-colors">
+                                        <i data-lucide="log-out" className="w-3.5 h-3.5"></i>
                                     </button>
                                 </div>
                             </div>
@@ -441,179 +443,170 @@
                         {view === 'list' ? (
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center px-2">
-                                    <h2 className="text-xl font-bold text-slate-500">เลือกกลุ่มที่ต้องการ</h2>
-                                    <button 
-                                        onClick={() => setShowAddGroup(true)} 
-                                        className="bg-[#B8C1EC] text-[#232946] px-6 py-3 rounded-3xl font-bold shadow-lg shadow-[#B8C1EC]/30 btn-glow border-b-4 border-[#a5add4] flex items-center gap-2"
-                                    >
-                                        <i data-lucide="plus-circle" className="w-5 h-5"></i> เปิดกลุ่มใหม่
+                                    <h2 className="text-2xl font-bold text-slate-500">เลือกกลุ่มที่ต้องการ</h2>
+                                    <button onClick={() => setShowAddGroup(true)} className="bg-[#B8C1EC] text-[#232946] px-8 py-4 rounded-3xl font-bold shadow-lg shadow-[#B8C1EC]/30 btn-glow border-b-4 border-[#a5add4] flex items-center gap-2 text-lg">
+                                        <i data-lucide="plus-circle" className="w-6 h-6"></i> เปิดกลุ่มใหม่
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     {groups.map(g => (
-                                        <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-6 hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer border-2 border-white relative group flex flex-col items-center text-center">
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }}
-                                                className="absolute top-4 right-4 p-2 text-slate-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                        <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-8 hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer border-2 border-white relative group flex flex-col items-center text-center">
+                                            <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="absolute top-6 right-6 p-2 text-slate-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                                                <i data-lucide="trash-2" className="w-5 h-5"></i>
                                             </button>
-                                            <div className="w-32 h-32 bg-white rounded-[2.5rem] flex items-center justify-center mb-4 shadow-inner border-4 border-[#FDFBF9] overflow-hidden">
-                                                {g.imageUrl ? (
-                                                    <img src={g.imageUrl} className="w-full h-full object-cover" alt={g.name} />
-                                                ) : (
-                                                    <span className="text-5xl">📊</span>
-                                                )}
+                                            <div className="w-36 h-36 bg-white rounded-[2.5rem] flex items-center justify-center mb-5 shadow-inner border-4 border-[#FDFBF9] overflow-hidden bg-slate-50">
+                                                {g.imageUrl ? <img src={g.imageUrl} className="w-full h-full object-cover" alt={g.name} /> : <span className="text-6xl">📊</span>}
                                             </div>
                                             <h3 className="text-2xl font-bold text-[#232946] mb-1">{g.name}</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">เปิดตี้เมื่อ: {formatDate(g.createdAt)}</p>
+                                            <p className="text-[12px] text-slate-400 font-bold uppercase tracking-widest mb-4">เปิดเมื่อ: {formatDate(g.createdAt)}</p>
                                             <div className="flex items-center gap-2">
-                                                <div className="flex -space-x-2">
+                                                <div className="flex -space-x-2.5">
                                                     {g.members.slice(0,5).map((m, i) => (
-                                                        <div key={i} style={{ backgroundColor: getMemberColor(m) }} className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold shadow-sm">{m[0].toUpperCase()}</div>
+                                                        <div key={i} style={{ backgroundColor: getMemberColor(m) }} className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[11px] font-bold shadow-sm">{m[0].toUpperCase()}</div>
                                                     ))}
                                                 </div>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{g.members.length} คนในกลุ่ม</span>
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{g.members.length} คนในกลุ่ม</span>
                                             </div>
                                         </div>
                                     ))}
-                                    {groups.length === 0 && (
-                                        <div className="col-span-full py-24 text-center glass-card border-dashed border-4 border-white opacity-60 flex flex-col items-center">
-                                            <i data-lucide="sparkles" className="w-12 h-12 text-slate-300 mb-4"></i>
-                                            <p className="text-xl font-bold text-slate-400">ยังไม่ได้เริ่มหารเงินกับเพื่อนเลย มาเปิดกลุ่มแรกกัน! ✨</p>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-8">
-                                {/* Stats & Adding Member */}
+                                {/* Stats Section with AI Image Background */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="md:col-span-2 glass-card p-10 bg-gradient-to-br from-[#B8C1EC] to-[#A0C4FF] text-[#232946] shadow-xl relative overflow-hidden">
+                                    <div 
+                                        className="md:col-span-2 glass-card p-12 text-[#232946] shadow-xl relative overflow-hidden flex flex-col justify-center"
+                                        style={{
+                                            backgroundImage: activeGroup.imageUrl ? `url(${activeGroup.imageUrl})` : 'none',
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center'
+                                        }}
+                                    >
+                                        {/* Overlay to ensure text readability */}
+                                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px]"></div>
+                                        
                                         <div className="relative z-10">
-                                            <h4 className="text-xs font-bold uppercase tracking-widest mb-2 opacity-70">ยอดเงินรวมทั้งหมด</h4>
-                                            <h2 className="text-5xl font-black">฿{formatMoney(totalSpent)}</h2>
-                                            <p className="text-[10px] font-bold mt-2 opacity-60">กลุ่มสร้างเมื่อ: {formatDate(activeGroup.createdAt)}</p>
-                                            <div className="flex flex-wrap gap-2 mt-8">
+                                            <h4 className="text-sm font-bold uppercase tracking-widest mb-2 opacity-90 leading-none">ยอดเงินรวมทั้งหมด</h4>
+                                            <h2 className="text-6xl font-black leading-tight drop-shadow-sm">฿{formatMoney(totalSpent)}</h2>
+                                            <p className="text-xs font-bold mt-4 opacity-80 leading-none bg-white/40 inline-block px-3 py-1 rounded-full border border-white">กลุ่มสร้างเมื่อ: {formatDate(activeGroup.createdAt)}</p>
+                                            
+                                            <div className="flex flex-wrap gap-2.5 mt-8">
                                                 {activeGroup.members.map(m => (
-                                                    <div key={m} className="flex items-center gap-1.5 bg-white/40 pl-1.5 pr-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border border-white/50">
-                                                        <div style={{backgroundColor: getMemberColor(m)}} className="w-4 h-4 rounded-lg border border-white shrink-0"></div>
+                                                    <div key={m} className="flex items-center gap-2 bg-white/80 pl-2 pr-4 py-1.5 rounded-full text-sm font-bold border border-white/50 shadow-sm">
+                                                        <div style={{backgroundColor: getMemberColor(m)}} className="w-5 h-5 rounded-lg border border-white shrink-0"></div>
                                                         {m}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="absolute -bottom-10 -right-10 opacity-10 rotate-12">
-                                            {activeGroup.imageUrl ? (
-                                                <img src={activeGroup.imageUrl} className="w-64 h-64 grayscale opacity-20" />
+                                        
+                                        {/* Regenerate AI Image Button */}
+                                        <button 
+                                            onClick={regenerateGroupImage}
+                                            disabled={isGeneratingGroupImage}
+                                            className="absolute top-6 right-6 p-4 bg-white/60 hover:bg-white/90 rounded-2xl backdrop-blur-md border border-white/80 transition-all group/ai z-20 shadow-md"
+                                            title="วาดรูปกลุ่มใหม่ด้วย AI"
+                                        >
+                                            {isGeneratingGroupImage ? (
+                                                <div className="w-6 h-6 border-2 border-[#232946]/20 border-t-[#232946] rounded-full animate-spin"></div>
                                             ) : (
-                                                <i data-lucide="wallet" className="w-64 h-64"></i>
+                                                <i data-lucide="sparkles" className="w-6 h-6 group-hover/ai:rotate-12 transition-transform"></i>
                                             )}
-                                        </div>
+                                        </button>
                                     </div>
                                     
-                                    <div className="glass-card p-8 flex flex-col border-2 border-white min-h-[350px]">
-                                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">ชาวแก๊งที่หารกัน ({activeGroup.members.length})</h4>
-                                        <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 mb-6">
+                                    <div className="glass-card p-10 flex flex-col border-2 border-white min-h-[400px]">
+                                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-5 leading-tight">ชาวแก๊งที่หารกัน ({activeGroup.members.length} คน)</h4>
+                                        <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 mb-8">
                                             {activeGroup.members.map(m => (
-                                                <div key={m} className="flex items-center justify-between bg-white/60 pl-2 pr-3 py-2 rounded-2xl border border-white group/m shadow-sm">
-                                                    <div className="flex items-center gap-3">
-                                                        <Avatar name={m} size="sm" />
-                                                        <span className="font-bold text-sm">{m}</span>
+                                                <div key={m} className="flex items-center justify-between bg-white/70 pl-2 pr-4 py-2.5 rounded-2xl border border-white group/m shadow-sm">
+                                                    <div className="flex items-center gap-4">
+                                                        <Avatar name={m} size="md" />
+                                                        <span className="font-bold text-base">{m}</span>
                                                     </div>
-                                                    <button onClick={() => removeMember(m)} className="text-red-300 hover:text-red-500 opacity-0 group-hover/m:opacity-100 transition-opacity p-1"><i data-lucide="x" className="w-4 h-4"></i></button>
+                                                    <button onClick={() => removeMember(m)} className="text-red-300 hover:text-red-500 opacity-0 group-hover/m:opacity-100 transition-opacity p-1"><i data-lucide="trash-2" className="w-5 h-5"></i></button>
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="space-y-3 pt-4 border-t border-white/40">
-                                            <p className="text-[10px] font-bold text-blue-400 text-center uppercase tracking-widest leading-none">ดึงเพื่อนเข้าตี้เพิ่ม</p>
+                                        <div className="space-y-4 pt-6 border-t border-white/40">
+                                            <p className="text-sm font-bold text-blue-400 text-center uppercase tracking-widest leading-none">ดึงเพื่อนเข้าตี้เพิ่ม</p>
                                             <div className="flex gap-2">
-                                                <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="พิมพ์ชื่อเพื่อน..." className="w-full bg-[#FDFBF9] px-4 py-5 rounded-2xl outline-none text-md font-bold border-2 border-slate-50 focus:border-[#B8C1EC] transition-all placeholder:text-slate-300 shadow-inner" onKeyDown={(e) => e.key === 'Enter' && addMember()} />
-                                                <button onClick={addMember} className="bg-[#EEBBC3] text-[#232946] px-6 rounded-2xl shadow-md active:scale-90 transition-all border-b-4 border-[#d69fa8] hover:bg-[#e8a9b4]"><i data-lucide="user-plus" className="w-6 h-6"></i></button>
+                                                <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="พิมพ์ชื่อเพื่อน..." className="w-full bg-[#FDFBF9] px-5 py-5 rounded-2xl outline-none text-lg font-bold border-2 border-slate-50 focus:border-[#B8C1EC] transition-all shadow-inner" onKeyDown={(e) => e.key === 'Enter' && addMember()} />
+                                                <button onClick={addMember} className="bg-[#EEBBC3] text-[#232946] px-7 rounded-2xl shadow-md active:scale-90 border-b-4 border-[#d69fa8] hover:bg-[#e8a9b4] transition-all"><i data-lucide="user-plus" className="w-7 h-7"></i></button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Who pays whom? (Settlement) */}
-                                <div className="glass-card p-10 border-2 border-white shadow-xl relative overflow-hidden">
-                                    <div className="flex justify-between items-center mb-8 relative z-10">
-                                        <h3 className="text-2xl font-bold flex items-center gap-3 text-[#232946]"><i data-lucide="arrow-right-left" className="text-[#FFD6A5] w-6 h-6"></i> ใครต้องโอนให้ใคร</h3>
+                                {/* Who pays whom? */}
+                                <div className="glass-card p-10 border-2 border-white shadow-xl relative overflow-hidden bg-white/60">
+                                    <div className="flex justify-between items-center mb-10 relative z-10">
+                                        <h3 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 text-[#232946] leading-relaxed"><i data-lucide="arrow-right-left" className="text-[#FFD6A5] w-7 h-7"></i> ใครต้องโอนให้ใคร</h3>
                                         <div className="flex gap-3">
-                                            <button onClick={exportImage} title="บันทึกรูปภาพ" className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400 hover:text-[#B8C1EC]"><i data-lucide="image" className="w-5 h-5"></i></button>
-                                            <button onClick={exportExcel} title="โหลดเป็น Excel" className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400 hover:text-[#CAFFBF]"><i data-lucide="file-spreadsheet" className="w-5 h-5"></i></button>
+                                            <button onClick={exportImage} title="บันทึกรูปภาพ" className="p-4 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400"><i data-lucide="image" className="w-6 h-6"></i></button>
+                                            <button onClick={exportExcel} title="โหลดเป็น Excel" className="p-4 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400"><i data-lucide="file-spreadsheet" className="w-6 h-6"></i></button>
                                         </div>
                                     </div>
-                                    <div className="space-y-4 relative z-10">
+                                    <div className="space-y-5 relative z-10">
                                         {settlements.map((s, i) => (
-                                            <div key={i} className="flex items-center justify-between bg-white/60 p-5 rounded-[2rem] border-2 border-white shadow-sm animate-pop">
-                                                <div className="flex items-center gap-4 flex-1">
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        <Avatar name={s.from} />
-                                                        <span className="font-bold text-xs">{s.from}</span>
+                                            <div key={i} className="flex items-center justify-between bg-white p-6 rounded-[2.5rem] border-2 border-white shadow-sm animate-pop">
+                                                <div className="flex items-center gap-6 flex-1">
+                                                    <div className="flex flex-col items-center gap-2 shrink-0">
+                                                        <Avatar name={s.from} size="lg" />
+                                                        <span className="font-bold text-base">{s.from}</span>
                                                     </div>
-                                                    <div className="flex-1 flex flex-col items-center">
-                                                        <i data-lucide="arrow-right" className="text-slate-300 w-6 h-6"></i>
-                                                        <span className="text-[10px] font-bold text-blue-300 uppercase tracking-tighter">ต้องโอนให้</span>
+                                                    <div className="flex-1 flex flex-col items-center gap-1">
+                                                        <i data-lucide="arrow-right" className="text-[#EEBBC3] w-8 h-8"></i>
+                                                        <span className="text-[11px] font-bold text-blue-300 uppercase tracking-wider">ต้องโอนให้</span>
                                                     </div>
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        <Avatar name={s.to} />
-                                                        <span className="font-bold text-xs">{s.to}</span>
+                                                    <div className="flex flex-col items-center gap-2 shrink-0">
+                                                        <Avatar name={s.to} size="lg" />
+                                                        <span className="font-bold text-base">{s.to}</span>
                                                     </div>
                                                 </div>
-                                                <div className="text-right pl-6">
-                                                    <span className="text-2xl font-black text-[#A0C4FF] whitespace-nowrap">฿{formatMoney(s.amount)}</span>
+                                                <div className="text-right pl-8 border-l border-slate-100 ml-6">
+                                                    <span className="text-3xl font-black text-[#A0C4FF] whitespace-nowrap">฿{formatMoney(s.amount)}</span>
                                                 </div>
                                             </div>
                                         ))}
-                                        {settlements.length === 0 && <div className="text-center py-10"><span className="text-4xl mb-4 block">✨</span><p className="text-slate-400 font-bold italic">เคลียร์กันครบทุกคนแล้ว แฮปปี้สุดๆ!</p></div>}
+                                        {settlements.length === 0 && <div className="text-center py-10"><span className="text-5xl mb-4 block">✨</span><p className="text-xl font-bold text-slate-400 italic">เคลียร์กันครบทุกคนแล้ว แฮปปี้สุดๆ!</p></div>}
                                     </div>
                                 </div>
 
                                 {/* Transaction History */}
-                                <div className="space-y-6">
-                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 px-2">
-                                        <h3 className="text-2xl font-bold text-[#232946]">รายการที่จ่ายไปแล้ว</h3>
+                                <div className="space-y-8">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-6 px-2">
+                                        <h3 className="text-2xl sm:text-3xl font-bold text-[#232946] leading-relaxed">รายการที่จ่ายไปแล้ว</h3>
                                         <button 
                                             onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer(activeGroup.members[0]); setExpParticipants(activeGroup.members); setShowExpenseModal(true); }} 
-                                            className="w-full sm:w-auto bg-[#EEBBC3] text-[#232946] px-12 py-5 rounded-[2.5rem] font-bold text-xl shadow-xl shadow-[#EEBBC3]/30 btn-glow border-b-4 border-[#d69fa8] flex items-center justify-center gap-3"
+                                            className="w-full sm:w-auto bg-[#EEBBC3] text-[#232946] px-16 py-6 rounded-[2.5rem] font-bold text-2xl shadow-xl shadow-[#EEBBC3]/30 btn-glow border-b-8 border-[#d69fa8] flex items-center justify-center gap-4 transition-all"
                                         >
-                                            <i data-lucide="plus-circle" className="w-7 h-7"></i> เพิ่มรายการใหม่
+                                            <i data-lucide="plus-circle" className="w-8 h-8"></i> เพิ่มรายการใหม่
                                         </button>
                                     </div>
-                                    <div className="grid gap-4">
+                                    <div className="grid gap-5">
                                         {expenses.map(e => (
-                                            <div key={e.id} className="glass-card p-6 flex items-center justify-between group hover:border-[#B8C1EC] transition-all border-2 border-white animate-pop shadow-md hover:shadow-xl">
-                                                <div className="flex items-center gap-5">
+                                            <div key={e.id} className="glass-card p-8 flex items-center justify-between group hover:border-[#B8C1EC] transition-all border-2 border-white animate-pop shadow-md hover:shadow-xl">
+                                                <div className="flex items-center gap-6">
                                                     <div className="relative">
                                                         <Avatar name={e.payer} size="md" />
-                                                        <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-lg border border-slate-100 shadow-sm text-[8px]">
-                                                            💰
-                                                        </div>
+                                                        <div className="absolute -bottom-1 -right-1 bg-white p-1.5 rounded-lg border border-slate-100 shadow-sm text-xs">💰</div>
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-bold text-xl text-[#232946] leading-none mb-1">{e.description}</h4>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">คนจ่าย:</span>
-                                                            <span className="text-sm font-bold text-[#B8C1EC] leading-none">{e.payer}</span>
-                                                            <span className="text-slate-200">|</span>
-                                                            <span className="text-[10px] font-bold text-slate-300 uppercase leading-none">หาร {e.participants.length} คน</span>
+                                                        <h4 className="font-bold text-2xl text-[#232946] leading-relaxed mb-1">{e.description}</h4>
+                                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                                                            <span className="text-[#B8C1EC]">{e.payer} จ่ายแล้ว</span> | <span>หาร {e.participants.length} คน</span>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-6">
+                                                <div className="flex items-center gap-8">
                                                     <div className="text-right">
-                                                        <p className="text-2xl font-black text-[#232946]">฿{formatMoney(e.amount)}</p>
-                                                        <div className="flex justify-end gap-1 mt-1">
-                                                            {e.participants.slice(0,3).map((p, idx) => (
-                                                                <div key={idx} style={{backgroundColor: getMemberColor(p)}} className="w-3 h-3 rounded-full border border-white"></div>
-                                                            ))}
-                                                            {e.participants.length > 3 && <span className="text-[8px] font-bold text-slate-300">+{e.participants.length-3}</span>}
-                                                        </div>
+                                                        <p className="text-3xl font-black text-[#232946]">฿{formatMoney(e.amount)}</p>
                                                     </div>
-                                                    <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-2 bg-white rounded-xl shadow-sm text-blue-300 hover:text-blue-500 transition-colors"><i data-lucide="edit-3" className="w-4 h-4"></i></button>
-                                                        <button onClick={() => deleteExpense(e.id)} className="p-2 bg-white rounded-xl shadow-sm text-red-200 hover:text-red-400 transition-colors"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                                    <div className="flex flex-col gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-2.5 bg-white rounded-xl shadow-sm text-blue-400 hover:text-blue-600 transition-colors"><i data-lucide="edit-3" className="w-5 h-5"></i></button>
+                                                        <button onClick={() => deleteExpense(e.id)} className="p-2.5 bg-white rounded-xl shadow-sm text-red-300 hover:text-red-500 transition-colors"><i data-lucide="trash-2" className="w-5 h-5"></i></button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -624,25 +617,25 @@
                         )}
                     </main>
 
-                    {/* Modals */}
+                    {/* Modals: Same logic but larger fonts */}
                     {showAddGroup && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#232946]/40 backdrop-blur-md animate-pop">
                             <div className="bg-white w-full max-w-sm rounded-[3rem] p-12 shadow-2xl border-4 border-[#EEBBC3] text-center">
                                 {isGenerating ? (
                                     <div className="flex flex-col items-center py-10">
-                                        <div className="loader-ai mb-6"></div>
-                                        <h3 className="text-2xl font-bold text-[#232946]">กำลังวาดรูปกลุ่มให้จ้า...</h3>
-                                        <p className="text-slate-400 mt-2 font-medium">AI กำลังสร้างรูปภาพตามชื่อกลุ่มคุณ</p>
+                                        <div className="loader-ai mb-8"></div>
+                                        <h3 className="text-3xl font-bold text-[#232946] leading-relaxed">กำลังวาดรูปกลุ่มให้จ้า...</h3>
+                                        <p className="text-slate-400 mt-2 font-medium text-lg">AI กำลังสร้างรูปภาพตามชื่อกลุ่มคุณ</p>
                                     </div>
                                 ) : (
                                     <>
-                                        <span className="text-5xl block mb-6 animate-bounce">🎈</span>
-                                        <h3 className="text-3xl font-bold mb-2 text-[#232946]">เปิดกลุ่มใหม่</h3>
-                                        <p className="text-slate-400 mb-8 font-medium">ชื่อกลุ่มนี้คืออะไรดีคะ?</p>
-                                        <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="เช่น ทริปเที่ยวหัวหิน..." className="w-full bg-[#FDFBF9] border-2 border-slate-100 px-6 py-5 rounded-3xl outline-none focus:ring-4 ring-[#EEBBC3]/20 font-bold mb-8 text-lg text-center" />
-                                        <div className="space-y-3">
-                                            <button onClick={createGroup} className="w-full bg-[#EEBBC3] text-[#232946] py-5 rounded-3xl font-bold shadow-xl btn-glow transition-all border-b-4 border-[#d69fa8]">เริ่มสร้างกลุ่มเลย!</button>
-                                            <button onClick={() => setShowAddGroup(false)} className="w-full py-2 text-slate-300 font-bold hover:text-slate-500 transition-colors">ไว้ก่อนจ้า</button>
+                                        <span className="text-6xl block mb-6 animate-bounce">🎈</span>
+                                        <h3 className="text-3xl font-bold mb-2 text-[#232946] leading-relaxed">เปิดกลุ่มใหม่</h3>
+                                        <p className="text-slate-400 mb-8 font-medium text-lg">ชื่อกลุ่มนี้คืออะไรดีคะ?</p>
+                                        <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="เช่น ทริปเที่ยวญี่ปุ่น..." className="w-full bg-[#FDFBF9] border-2 border-slate-100 px-6 py-6 rounded-3xl outline-none focus:ring-4 ring-[#EEBBC3]/20 font-bold mb-8 text-xl text-center" onKeyDown={(e) => e.key === 'Enter' && createGroup()} />
+                                        <div className="space-y-4">
+                                            <button onClick={createGroup} className="w-full bg-[#EEBBC3] text-[#232946] py-6 rounded-3xl font-bold shadow-xl btn-glow transition-all border-b-4 border-[#d69fa8] text-xl">เริ่มสร้างกลุ่มเลย!</button>
+                                            <button onClick={() => setShowAddGroup(false)} className="w-full py-2 text-slate-300 font-bold hover:text-slate-500 text-lg">ไว้ก่อนจ้า</button>
                                         </div>
                                     </>
                                 )}
@@ -652,12 +645,12 @@
 
                     {showEditGroup && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#232946]/40 backdrop-blur-md animate-pop">
-                            <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 shadow-2xl border-4 border-[#B8C1EC] text-center">
-                                <h3 className="text-2xl font-bold mb-6 text-[#232946]">เปลี่ยนชื่อกลุ่ม</h3>
-                                <input autoFocus value={editGroupName} onChange={e => setEditGroupName(e.target.value)} className="w-full bg-[#FDFBF9] border-2 border-slate-100 px-6 py-4 rounded-2xl outline-none focus:ring-4 ring-[#B8C1EC]/20 font-bold mb-8 text-lg text-center shadow-inner" />
-                                <div className="flex gap-3">
-                                    <button onClick={() => setShowEditGroup(false)} className="flex-1 py-4 text-slate-300 font-bold hover:text-slate-500 transition-colors">ยกเลิก</button>
-                                    <button onClick={updateGroupName} className="flex-1 bg-[#B8C1EC] text-[#232946] py-4 rounded-2xl font-bold shadow-lg border-b-4 border-[#a5add4] hover:bg-[#a5add4] transition-all">บันทึก</button>
+                            <div className="bg-white w-full max-w-sm rounded-[3rem] p-12 shadow-2xl border-4 border-[#B8C1EC] text-center">
+                                <h3 className="text-3xl font-bold mb-8 text-[#232946] leading-relaxed">เปลี่ยนชื่อกลุ่ม</h3>
+                                <input autoFocus value={editGroupName} onChange={e => setEditGroupName(e.target.value)} className="w-full bg-[#FDFBF9] border-2 border-slate-100 px-6 py-5 rounded-3xl outline-none focus:ring-4 ring-[#B8C1EC]/20 font-bold mb-10 text-xl text-center shadow-inner" onKeyDown={(e) => e.key === 'Enter' && updateGroupName()} />
+                                <div className="flex gap-4">
+                                    <button onClick={() => setShowEditGroup(false)} className="flex-1 py-4 text-slate-300 font-bold text-lg hover:text-slate-500">ยกเลิก</button>
+                                    <button onClick={updateGroupName} className="flex-1 bg-[#B8C1EC] text-[#232946] py-5 rounded-3xl font-bold shadow-lg border-b-4 border-[#a5add4] text-xl">บันทึก</button>
                                 </div>
                             </div>
                         </div>
@@ -665,63 +658,59 @@
 
                     {showExpenseModal && (
                         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-[#232946]/40 backdrop-blur-md animate-pop">
-                            <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[4rem] p-10 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#B8C1EC]">
-                                <div className="flex justify-between items-center mb-8">
-                                    <h3 className="text-3xl font-bold text-[#232946]">{editingExpense ? 'แก้ข้อมูลบิล' : 'จ่ายค่าอะไรไปบ้าง'}</h3>
-                                    <button onClick={() => setShowExpenseModal(false)} className="p-3 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"><i data-lucide="x" className="w-6 h-6"></i></button>
+                            <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[4rem] p-12 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#B8C1EC]">
+                                <div className="flex justify-between items-center mb-10">
+                                    <h3 className="text-3xl font-bold text-[#232946] leading-relaxed">{editingExpense ? 'แก้ข้อมูลบิล' : 'จ่ายค่าอะไรไปบ้าง'}</h3>
+                                    <button onClick={() => setShowExpenseModal(false)} className="p-3 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"><i data-lucide="x" className="w-7 h-7"></i></button>
                                 </div>
-                                <div className="space-y-8">
-                                    <div className="bg-[#B8C1EC]/10 p-6 rounded-[2.5rem] border-2 border-[#B8C1EC]/20 shadow-inner">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 leading-none">จ่ายค่าอะไรคะ?</label>
-                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าที่พัก, ค่าน้ำส้ม" className="w-full bg-white px-4 py-4 rounded-2xl outline-none font-bold text-lg border border-white focus:ring-2 ring-blue-100 transition-all shadow-sm" />
+                                <div className="space-y-10 text-left">
+                                    <div className="bg-[#B8C1EC]/10 p-8 rounded-[2.5rem] border-2 border-[#B8C1EC]/20 shadow-inner">
+                                        <label className="text-[12px] font-bold text-slate-400 uppercase tracking-widest block mb-3 leading-none">จ่ายค่าอะไรคะ?</label>
+                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าที่พัก, ค่าน้ำส้ม" className="w-full bg-white px-5 py-5 rounded-2xl outline-none font-bold text-xl border border-white focus:ring-2 ring-blue-100 transition-all shadow-sm" />
                                     </div>
-                                    <div className="bg-[#FFD6A5]/10 p-6 rounded-[2.5rem] border-2 border-[#FFD6A5]/20 shadow-inner">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 leading-none">กี่บาทคะ? (คำนวณได้นะ)</label>
+                                    <div className="bg-[#FFD6A5]/10 p-8 rounded-[2.5rem] border-2 border-[#FFD6A5]/20 shadow-inner">
+                                        <label className="text-[12px] font-bold text-slate-400 uppercase tracking-widest block mb-3 leading-none">กี่บาทคะ? (คำนวณได้นะ)</label>
                                         <div className="relative">
-                                            <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0" className="w-full bg-white px-6 py-6 rounded-2xl outline-none font-black text-3xl text-[#A0C4FF] pr-32 border border-white shadow-sm" />
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 bg-[#FDFBF9] px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
+                                            <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0" className="w-full bg-white px-6 py-7 rounded-2xl outline-none font-black text-4xl text-[#A0C4FF] pr-36 border border-white shadow-sm" />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-300 bg-[#FDFBF9] px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
                                                 = ฿{formatMoney(evaluateMath(expAmount))}
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 leading-none">ใครเป็นคนเปย์?</label>
-                                        <div className="flex overflow-x-auto gap-3 pb-2 no-scrollbar">
+                                    <div className="space-y-5">
+                                        <label className="text-[12px] font-bold text-slate-400 uppercase tracking-widest block mb-3 leading-none">ใครเป็นคนเปย์?</label>
+                                        <div className="flex overflow-x-auto gap-4 pb-3 no-scrollbar">
                                             {activeGroup.members.map(m => (
-                                                <button 
-                                                    key={m} 
-                                                    onClick={() => setExpPayer(m)} 
-                                                    className={`shrink-0 flex flex-col items-center gap-2 p-3 rounded-[2rem] border-2 transition-all ${expPayer === m ? 'bg-white border-[#B8C1EC] shadow-md scale-105' : 'border-transparent opacity-60'}`}
-                                                >
-                                                    <Avatar name={m} />
-                                                    <span className="text-[10px] font-bold">{m}</span>
+                                                <button key={m} onClick={() => setExpPayer(m)} className={`shrink-0 flex flex-col items-center gap-3 p-4 rounded-[2.5rem] border-2 transition-all ${expPayer === m ? 'bg-white border-[#B8C1EC] shadow-md scale-105' : 'border-transparent opacity-60'}`}>
+                                                    <Avatar name={m} size="md" />
+                                                    <span className="text-xs font-bold">{m}</span>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4">
+                                    <div className="space-y-5">
                                         <div className="flex justify-between items-center">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ใครร่วมหารบ้าง? ({expParticipants.length} คน)</label>
-                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="text-[10px] font-bold text-blue-400 border border-blue-100 px-4 py-1.5 rounded-full hover:bg-blue-50 transition-colors">หารทุกคน</button>
+                                            <label className="text-[12px] font-bold text-slate-400 uppercase tracking-widest leading-none">ใครร่วมหารบ้าง? ({expParticipants.length} คน)</label>
+                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="text-xs font-bold text-blue-400 border border-blue-100 px-5 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm">หารทุกคน</button>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-2 gap-4">
                                             {activeGroup.members.map(m => (
-                                                <button key={m} onClick={() => expParticipants.includes(m) ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])} className={`flex items-center gap-3 px-4 py-5 rounded-2xl font-bold border-2 transition-all text-sm ${expParticipants.includes(m) ? 'bg-[#EEBBC3] border-[#EEBBC3] text-[#232946] shadow-lg scale-[1.02]' : 'bg-[#FDFBF9] border-slate-50 text-slate-400'}`}>
-                                                    <div style={{backgroundColor: expParticipants.includes(m) ? 'white' : getMemberColor(m)}} className="w-5 h-5 rounded-lg shrink-0 border border-white flex items-center justify-center text-[8px] font-black">{m[0].toUpperCase()}</div>
+                                                <button key={m} onClick={() => expParticipants.includes(m) ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])} className={`flex items-center gap-4 px-5 py-6 rounded-3xl font-bold border-2 transition-all text-base ${expParticipants.includes(m) ? 'bg-[#EEBBC3] border-[#EEBBC3] text-[#232946] shadow-lg scale-[1.02]' : 'bg-[#FDFBF9] border-slate-50 text-slate-400'}`}>
+                                                    <div style={{backgroundColor: expParticipants.includes(m) ? 'white' : getMemberColor(m)}} className="w-7 h-7 rounded-xl shrink-0 border border-white flex items-center justify-center text-[10px] font-black">{m[0].toUpperCase()}</div>
                                                     <span className="truncate">{m}</span>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <button onClick={saveExpense} className="w-full bg-[#232946] text-white py-7 rounded-[2.5rem] font-bold text-2xl shadow-2xl active:scale-95 transition-all mt-4 border-b-8 border-black">บันทึกรายการเลย!</button>
+                                    <button onClick={saveExpense} className="w-full bg-[#232946] text-white py-8 rounded-[3rem] font-bold text-2xl shadow-2xl active:scale-95 transition-all mt-6 border-b-8 border-black leading-relaxed">บันทึกรายการเลย!</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Export Area */}
+                    {/* Export Area Container */}
                     <div id="export-area" className="p-10 bg-[#FDFBF9]">
                         <div className="glass-card p-10 border-4 border-white shadow-2xl text-center">
                             <span className="text-4xl block mb-2">🎀</span>
@@ -733,7 +722,7 @@
                                     <p className="text-4xl font-black text-[#232946]">฿{formatMoney(totalSpent)}</p>
                                 </div>
                                 <div className="space-y-3">
-                                    <h3 className="font-bold border-l-8 border-[#EEBBC3] pl-4 text-[#232946] ml-2">ใครต้องโอนให้ใคร</h3>
+                                    <h3 className="font-bold border-l-8 border-[#EEBBC3] pl-4 text-[#232946] ml-2 leading-relaxed">ใครต้องโอนให้ใคร</h3>
                                     {settlements.map((s, i) => (
                                         <div key={i} className="flex justify-between bg-white/70 p-5 rounded-2xl border-2 border-white shadow-sm">
                                             <span className="font-bold text-[#232946]">{s.from} ➜ {s.to}</span>
