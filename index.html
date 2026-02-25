@@ -7,7 +7,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM (UMD development version for better error messages, though production is fine too) -->
+    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
@@ -39,7 +39,6 @@
             margin: 0;
             overflow-x: hidden;
             -webkit-tap-highlight-color: transparent;
-            /* ธีมไล่สีพาสเทล ฟ้า-ชมพู */
             background: linear-gradient(135deg, #FFE4E1 0%, #FFF0F5 30%, #E6E6FA 60%, #E0F7FA 100%);
             background-attachment: fixed;
             min-height: 100vh;
@@ -47,7 +46,6 @@
 
         h1, h2, h3, h4 { font-family: var(--font-display); }
 
-        /* การไล่สีพื้นหลังของกล่อง Glassmorphism */
         .glass-card {
             background: rgba(255, 255, 255, 0.65);
             backdrop-filter: blur(20px);
@@ -57,7 +55,6 @@
             box-shadow: 0 12px 40px -8px rgba(255, 182, 193, 0.25);
         }
 
-        /* ปุ่มหลักโทนชมพูพาสเทล */
         .btn-primary {
             background: linear-gradient(135deg, #FFB6C1, #FFC0CB);
             color: #2B3A4A;
@@ -67,7 +64,6 @@
         }
         .btn-primary:active { transform: translateY(3px); border-bottom-width: 2px; }
 
-        /* ปุ่มรองโทนฟ้าพาสเทล */
         .btn-secondary {
             background: linear-gradient(135deg, #B0E0E6, #ADD8E6);
             color: #2B3A4A;
@@ -77,7 +73,6 @@
         }
         .btn-secondary:active { transform: translateY(3px); border-bottom-width: 2px; }
 
-        /* คลาสหน้าตารูปดอกไม้ (Flower Shape) ด้วย mask-image */
         .shape-flower {
             -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z'/%3E%3C/svg%3E");
             -webkit-mask-size: 100% 100%;
@@ -97,13 +92,14 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* การตั้งค่า Layout ให้ Export Image ปลดล็อกความสูง ปล่อยไหลแบบ Infographic */
+        /* ปรับ Layout การ Export ให้กว้าง 1200px และความสูงอิสระ (ไม่ล้น) */
         #export-area { 
             position: absolute; 
             left: -9999px; 
             top: 0; 
-            width: 1200px; /* ความกว้างคงที่เพื่อให้รูปคมชัดและจัดง่าย */
-            height: auto;
+            width: 1200px;
+            height: auto; 
+            z-index: -9999;
         }
     </style>
 </head>
@@ -112,11 +108,9 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
-
-        // Ensure ReactDOM is available, fallback to window.ReactDOM if needed
         const ReactDOMClient = window.ReactDOM;
 
-        // Firebase Initialization
+        // Firebase Configuration
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : {
@@ -128,6 +122,7 @@
                 appId: "1:259280883710:web:67d7ce7b1f8e5e196a7aaf"
             };
 
+        // สำคัญ: บังคับใช้ ID เดียวกันเสมอ เพื่อให้เปิดบน Github Pages แล้วข้อมูลไม่หาย!
         const appId = (typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'default-trip-app';
 
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -137,13 +132,12 @@
         const handlePermissionError = (e, contextMessage) => {
             console.error(`${contextMessage} Error:`, e);
             if (e.message && (e.message.includes('permission') || e.message.includes('insufficient'))) {
-                alert(`⚠️ ${contextMessage} (Permission Denied)\nกรุณาตรวจสอบกฎของ Firestore ใน Firebase Console`);
+                alert(`⚠️ ${contextMessage} (Permission Denied)\nกรุณาตรวจสอบกฎของ Firestore ใน Firebase Console\nหรือโปรดลองรีเฟรชหน้าจอใหม่อีกครั้งเพื่อเข้าสู่ระบบอัตโนมัติ`);
             } else {
                 alert(`${contextMessage}: ${e.message}`);
             }
         };
 
-        // Component สำหรับแสดง Icon อย่างปลอดภัย เพื่อป้องกัน React removeChild Error
         const LucideIcon = ({ name, className = "" }) => {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -156,34 +150,22 @@
         };
 
         function App() {
-            // ชุด Emoji สุ่มแทนไอคอนเดิม
             const TRAVEL_EMOJIS = ['✈️', '🏝️', '🏕️', '🏔️', '🏰', '🗽', '🌸', '🌈', '🎨', '🎈', '🎠', '🏖️', '🗼', '⛩️', '🚤', '🍩', '📸', '🧸'];
-            
-            // ชุดสีพาสเทล 20 สี สำหรับพื้นหลังกลุ่ม
-            const PASTEL_COLORS = [
-                '#FFD1DC', '#F8E2E9', '#FADADD', '#E6E6FA', '#E0F7FA', 
-                '#D0E8F2', '#B0E0E6', '#FFB6C1', '#FFDAC1', '#FFB7B2', 
-                '#FF9AA2', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F1CBFF', 
-                '#D4F0F0', '#FDFD96', '#FFDFD3', '#FEC8D8', '#D291BC'
-            ];
+            const PASTEL_COLORS = ['#FFD1DC', '#F8E2E9', '#FADADD', '#E6E6FA', '#E0F7FA', '#D0E8F2', '#B0E0E6', '#FFB6C1', '#FFDAC1', '#FFB7B2', '#FF9AA2', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F1CBFF', '#D4F0F0', '#FDFD96', '#FFDFD3', '#FEC8D8', '#D291BC'];
+            const VIBRANT_COLORS = ['#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5', '#00BBF9', '#00F5D4', '#F28F3B', '#C8E9A0', '#FF9AA2', '#B5EAD7', '#C7CEEA', '#E2F0CB', '#FFB7B2', '#E6A8D7', '#97C1A9', '#8FCACA', '#F6A6FF', '#B28DFF'];
 
-            // ชุดสี 20 สีที่สว่าง สดใส และแตกต่างกันเยอะๆ สำหรับสีสมาชิก
-            const VIBRANT_COLORS = [
-                '#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93',
-                '#F15BB5', '#00BBF9', '#00F5D4', '#F28F3B', '#C8E9A0',
-                '#FF9AA2', '#B5EAD7', '#C7CEEA', '#E2F0CB', '#FFB7B2',
-                '#E6A8D7', '#97C1A9', '#8FCACA', '#F6A6FF', '#B28DFF'
-            ];
+            // ป้องกันหน้าจอกระพริบ (Flicker) ระหว่างโหลด Dashboard Link
+            const urlParams = new URLSearchParams(window.location.search);
+            const dashIdFromUrl = urlParams.get('dashboard');
 
             const [user, setUser] = useState(null);
-            const [view, setView] = useState('list'); // 'list', 'detail', 'dashboard'
+            const [view, setView] = useState(dashIdFromUrl ? 'dashboard' : 'list'); 
             const [groups, setGroups] = useState([]);
             const [activeGroup, setActiveGroup] = useState(null);
             const [expenses, setExpenses] = useState([]);
             const [loading, setLoading] = useState(true);
             const [exporting, setExporting] = useState(false);
 
-            // Modals & Inputs
             const [showAddGroup, setShowAddGroup] = useState(false);
             const [showJoinGroup, setShowJoinGroup] = useState(false);
             const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -199,16 +181,18 @@
             const [expPayer, setExpPayer] = useState('');
             const [expParticipants, setExpParticipants] = useState([]);
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const dashIdFromUrl = urlParams.get('dashboard');
-
-            // Rule 3: Auth Initialization
+            // 1. Auth Init
             useEffect(() => {
                 let isMounted = true;
                 const initAuth = async () => {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await auth.signInWithCustomToken(__initial_auth_token);
+                            try {
+                                await auth.signInWithCustomToken(__initial_auth_token);
+                            } catch (e) {
+                                console.warn("Custom token mismatch, falling back to anonymous auth:", e);
+                                await auth.signInAnonymously();
+                            }
                         } else {
                             await auth.signInAnonymously();
                         }
@@ -216,9 +200,7 @@
                         console.error("Auth Error:", err);
                     }
                 };
-
                 initAuth();
-
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     if (isMounted) {
                         setUser(u);
@@ -228,7 +210,7 @@
                 return () => { isMounted = false; unsubscribe(); };
             }, []);
 
-            // Dashboard Link Mode Handling
+            // 2. Load Dashboard (ถ้ามี Link) - ต้องรอให้ Auth เสร็จก่อน
             useEffect(() => {
                 if (!user) return;
                 const params = new URLSearchParams(window.location.search);
@@ -242,16 +224,18 @@
                             setActiveGroup({ id: doc.id, ...doc.data() });
                             setView('dashboard');
                         } else {
-                            alert("ลิงก์แดชบอร์ดไม่ถูกต้อง หรือกลุ่มถูกลบไปแล้ว");
+                            alert("ลิงก์แดชบอร์ดไม่ถูกต้อง หรือกลุ่มนี้ถูกลบไปแล้วครับ");
                             window.history.replaceState({}, document.title, window.location.pathname);
                             setView('list');
                         }
-                    }, (err) => console.error("Dashboard Fetch Error:", err));
+                    }, (err) => {
+                        console.error("Dashboard Fetch Error:", err);
+                    });
                 }
                 return () => unsubscribe();
             }, [user]);
 
-            // ระบบ Auto-Join เมื่อเข้าผ่านลิงก์ ?join=xxx
+            // 3. ระบบ Auto-Join เมื่อเข้าผ่านลิงก์ ?join=xxx - ต้องรอให้ Auth เสร็จก่อน
             useEffect(() => {
                 const processInviteLink = async () => {
                     if (!user || user.isAnonymous) return;
@@ -280,20 +264,21 @@
                             }
                         } catch (e) {
                             console.error("Auto-join error:", e);
+                            handlePermissionError(e, "เข้าร่วมกลุ่มอัตโนมัติไม่สำเร็จ");
                         } finally {
                             window.history.replaceState({}, document.title, window.location.pathname);
                         }
                     }
                 };
-                
                 processInviteLink();
             }, [user]);
 
-            // ดึงข้อมูลกลุ่ม (สำหรับหน้า List)
+            // 4. โหลดรายชื่อกลุ่ม (List) - ต้องรอให้ Auth เสร็จก่อน
             useEffect(() => {
-                if (!user || user.isAnonymous || dashIdFromUrl) return;
-                const myName = user.displayName?.split(' ')[0] || 'ฉัน';
+                const params = new URLSearchParams(window.location.search);
+                if (!user || user.isAnonymous || params.get('dashboard')) return;
                 
+                const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                 const groupsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
                 
                 const unsubscribe = groupsRef.onSnapshot((snap) => {
@@ -308,12 +293,18 @@
                         const updated = myGroups.find(g => g.id === activeGroup.id);
                         if (updated) setActiveGroup(updated);
                     }
-                }, (err) => console.error("Firestore Groups Error:", err));
+                }, (err) => {
+                    console.error("Firestore Groups Error:", err);
+                    // Only show alert if it's not a known missing permission error on first load
+                    if (!err.message.includes('permission')) {
+                         handlePermissionError(err, "ดึงรายชื่อกลุ่มไม่สำเร็จ");
+                    }
+                });
                 
                 return () => unsubscribe();
-            }, [user, activeGroup?.id, view, dashIdFromUrl]);
+            }, [user, activeGroup?.id, view]);
 
-            // ดึงข้อมูลค่าใช้จ่าย
+            // 5. โหลดค่าใช้จ่าย (Expenses) - ต้องรอให้ Auth เสร็จก่อน
             useEffect(() => {
                 if (!user || !activeGroup) return;
                 const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
@@ -321,24 +312,29 @@
                 const unsubscribe = expRef.onSnapshot((snap) => {
                     const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setExpenses(list.sort((a, b) => b.date - a.date));
-                }, (err) => console.error("Firestore Expenses Error:", err));
+                }, (err) => {
+                    console.error("Firestore Expenses Error:", err);
+                    if (!err.message.includes('permission')) {
+                         handlePermissionError(err, "ดึงรายการค่าใช้จ่ายไม่สำเร็จ");
+                    }
+                });
 
                 return () => unsubscribe();
             }, [user, activeGroup?.id]);
 
-            // Helpers สำหรับสุ่ม Emoji และ สี ตามไอดีกลุ่ม/ชื่อ
             const getGroupStyle = (id = "default") => {
                 let hash = 0;
                 for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-                const color = PASTEL_COLORS[Math.abs(hash) % PASTEL_COLORS.length]; // ใช้พาสเทลสำหรับพื้นหลังกลุ่ม
-                const emoji = TRAVEL_EMOJIS[Math.abs(hash) % TRAVEL_EMOJIS.length];
-                return { color, emoji };
+                return { 
+                    color: PASTEL_COLORS[Math.abs(hash) % PASTEL_COLORS.length], 
+                    emoji: TRAVEL_EMOJIS[Math.abs(hash) % TRAVEL_EMOJIS.length] 
+                };
             };
 
             const getMemberColor = (name) => {
                 let hash = 0;
                 for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-                return VIBRANT_COLORS[Math.abs(hash) % VIBRANT_COLORS.length]; // ใช้สีสดใสสำหรับคน
+                return VIBRANT_COLORS[Math.abs(hash) % VIBRANT_COLORS.length];
             };
 
             const formatMoney = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -346,8 +342,7 @@
             const formatDate = (timestamp) => {
                 if (!timestamp) return '';
                 return new Date(timestamp).toLocaleString('th-TH', {
-                    day: 'numeric', month: 'short', year: '2-digit',
-                    hour: '2-digit', minute: '2-digit'
+                    day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
                 });
             };
 
@@ -371,15 +366,13 @@
                 document.execCommand('copy');
                 document.body.removeChild(el);
 
-                // เพิ่มการตรวจสอบลิงก์ชั่วคราว (blob:)
                 if (baseUrl.startsWith('blob:')) {
-                    alert("⚠️ คุณกำลังใช้งานในโหมด Preview (blob:)\n\nลิงก์ที่คุณคัดลอกไปจะเป็นลิงก์จำลอง ไม่สามารถส่งให้เพื่อนเปิดได้ครับ\n\nหากต้องการให้ส่งลิงก์ได้จริง คุณต้องนำไฟล์ HTML นี้ไปอัปโหลดขึ้น Web Hosting (เช่น Netlify หรือ Firebase Hosting) ก่อนครับ");
+                    alert("⚠️ คุณกำลังใช้โหมด Preview\nต้องนำไฟล์ HTML นี้ไปฝากไว้บนเว็บจริง (เช่น Netlify หรือ Github Pages) ก่อน ลิงก์ถึงจะส่งให้เพื่อนใช้งานได้จริงครับ");
                 } else {
                     alert("คัดลอกลิงก์เชิญเพื่อนแล้ว! ส่งให้เพื่อนกดเข้าร่วมทริปได้เลยทันที 🔗✨");
                 }
             };
 
-            // สร้างลิงก์ Dashboard แบบ Read-only สำหรับทุกคน
             const copyDashboardLink = () => {
                 if (!activeGroup) return;
                 const baseUrl = window.location.href.split('?')[0];
@@ -392,9 +385,8 @@
                 document.execCommand('copy');
                 document.body.removeChild(el);
 
-                // เพิ่มการตรวจสอบลิงก์ชั่วคราว (blob:)
                 if (baseUrl.startsWith('blob:')) {
-                    alert("⚠️ คุณกำลังใช้งานในโหมด Preview (blob:)\n\nลิงก์ Dashboard ที่คุณคัดลอกไปจะเป็นลิงก์จำลอง ไม่สามารถส่งให้คนอื่นเปิดได้ครับ\n\nหากต้องการให้ส่งลิงก์ได้จริง คุณต้องนำไฟล์ HTML นี้ไปอัปโหลดขึ้น Web Hosting ก่อนครับ");
+                    alert("⚠️ คุณกำลังใช้โหมด Preview\nลิงก์แชร์ Dashboard นี้จะยังเปิดไม่ได้จนกว่าคุณจะอัปโหลดเว็บนี้ขึ้นโฮสติ้งจริง (เช่น Github Pages) ครับ");
                 } else {
                     alert("คัดลอกลิงก์ Dashboard แล้ว! ส่งให้ใครดูก็ได้โดยไม่ต้องล็อกอินครับ 📊✨");
                 }
@@ -527,11 +519,11 @@
 
                 try {
                     const canvas = await html2canvas(element, { 
-                        scale: 2, // 2x resolution
+                        scale: 2, 
                         backgroundColor: '#FFE4E1',
                         useCORS: true,
-                        width: 1200, // กำหนดความกว้างคงที่ 1200
-                        height: element.scrollHeight, // ความสูงอิสระ (auto)
+                        width: 1200, 
+                        height: element.scrollHeight, 
                         windowWidth: 1200
                     });
                     const link = document.createElement('a');
@@ -547,7 +539,6 @@
                 setExporting(false);
             };
 
-            // Calculations
             const totalSpent = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
             
             const individualShares = useMemo(() => {
@@ -569,7 +560,7 @@
                 
                 return Object.keys(stats).map(name => {
                     const s = stats[name];
-                    s.balance = s.paid - s.share; // + ได้คืน, - ต้องจ่ายเพิ่ม
+                    s.balance = s.paid - s.share;
                     return { name, ...s };
                 }).sort((a, b) => b.balance - a.balance);
             }, [activeGroup, expenses]);
@@ -634,10 +625,10 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.9); padding: 1.5rem; border-radius: 1.5rem; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1rem;">
                         <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
                              <div style="background-color: ${getMemberColor(s.from)}; width: 2.5rem; height: 2.5rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: white; font-size: 1.25rem; -webkit-mask-image: url('data:image/svg+xml,%3Csvg viewBox=\\'0 0 100 100\\' xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Cpath d=\\'M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z\\'/%3E%3C/svg%3E'); mask-image: url('data:image/svg+xml,%3Csvg viewBox=\\'0 0 100 100\\' xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Cpath d=\\'M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z\\'/%3E%3C/svg%3E'); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; text-shadow: 0px 1px 2px rgba(0,0,0,0.3);">${(s.from && s.from[0]) ? s.from[0].toUpperCase() : ''}</div>
-                            <span style="font-weight: bold; font-size: 1.25rem;">${s.from}</span>
+                            <span style="font-weight: bold; font-size: 1.25rem; white-space: nowrap;">${s.from}</span>
                             <div style="background: #E0F7FA; color: #55ABC8; padding: 0.25rem 1rem; border-radius: 9999px; font-size: 0.875rem; font-weight: bold;">จ่ายให้ ➔</div>
                              <div style="background-color: ${getMemberColor(s.to)}; width: 2.5rem; height: 2.5rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: white; font-size: 1.25rem; -webkit-mask-image: url('data:image/svg+xml,%3Csvg viewBox=\\'0 0 100 100\\' xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Cpath d=\\'M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z\\'/%3E%3C/svg%3E'); mask-image: url('data:image/svg+xml,%3Csvg viewBox=\\'0 0 100 100\\' xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Cpath d=\\'M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z\\'/%3E%3C/svg%3E'); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; text-shadow: 0px 1px 2px rgba(0,0,0,0.3);">${(s.to && s.to[0]) ? s.to[0].toUpperCase() : ''}</div>
-                            <span style="font-weight: bold; font-size: 1.25rem;">${s.to}</span>
+                            <span style="font-weight: bold; font-size: 1.25rem; white-space: nowrap;">${s.to}</span>
                         </div>
                         <div style="padding-left: 1.5rem; border-left: 2px solid #f1f5f9; text-align: right;">
                             <p style="font-size: 0.75rem; color: #94a3b8; font-weight: bold; text-transform: uppercase;">ต้องโอน</p>
@@ -1283,7 +1274,7 @@
                                         <label className="text-[12px] font-bold text-slate-500 uppercase tracking-widest block mb-3">ใครเป็นคนจ่ายเงินรอบนี้?</label>
                                         <div className="flex flex-wrap gap-2.5 pb-2">
                                             {(activeGroup.members || []).map(m => (
-                                                <button key={m} onClick={() => setExpPayer(m)} className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all ${expPayer === m ? 'border-[#FFB6C1] bg-[#FFF0F5] shadow-sm text-[#2B3A4A]' : 'border-slate-200 bg-slate-50 opacity-70 hover:opacity-100 hover:border-slate-300 text-slate-500'}`}>
+                                                <button key={m} onClick={() => setExpPayer(m)} className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all ${expPayer === m ? 'border-[#FFB6C1] bg-[#FFF0F5] shadow-md text-[#2B3A4A]' : 'border-slate-200 bg-slate-50 opacity-70 hover:opacity-100 hover:border-slate-300 text-slate-500'}`}>
                                                     <Avatar name={m} size="sm" />
                                                     <span className="text-[13px] font-bold">{m}</span>
                                                 </button>
