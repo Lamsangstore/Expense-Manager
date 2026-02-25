@@ -30,7 +30,7 @@
             color: #232946;
         }
 
-        h1, h2, h3, .cute-font { 
+        h1, h2, h3, h4, .cute-font { 
             font-family: 'Mali', cursive; 
         }
 
@@ -45,10 +45,6 @@
             border-radius: 32px;
             box-shadow: 0 10px 30px -5px rgba(184, 193, 236, 0.3);
         }
-
-        .pastel-pink { background-color: #EEBBC3; }
-        .pastel-blue { background-color: #B8C1EC; }
-        .pastel-cream { background-color: #FFFFFE; }
 
         .btn-glow:active { transform: scale(0.96); }
         .btn-glow:hover { box-shadow: 0 0 20px rgba(238, 187, 195, 0.6); }
@@ -84,6 +80,12 @@
         const db = firebase.firestore();
 
         const partyEmojis = ['🍕', '🍣', '🍻', '✈️', '🍲', '☕', '🎳', '🛍️', '🎤', '🏖️', '⛰️', '🍱', '🍖', '🎮', '🚗', '🚢', '🥘', '🍿', '🎡', '🎀', '🧸'];
+        
+        const memberColors = [
+            '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', 
+            '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', 
+            '#A4E4E0', '#FFCCF9', '#D4D9F5', '#F2CC8F'
+        ];
 
         function App() {
             const [user, setUser] = useState(null);
@@ -131,6 +133,16 @@
             }, [user, activeGroup]);
 
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+
+            // Helper to get consistent color for a name
+            const getMemberColor = (name) => {
+                let hash = 0;
+                for (let i = 0; i < name.length; i++) {
+                    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const index = Math.abs(hash) % memberColors.length;
+                return memberColors[index];
+            };
 
             const evaluateMath = (str) => {
                 try {
@@ -240,19 +252,36 @@
                 element.style.position = "absolute";
                 element.style.left = "-9999px";
                 const link = document.createElement('a');
-                link.download = `BillSummary_${activeGroup.name}.png`;
+                link.download = `สรุปบิล_${activeGroup.name}.png`;
                 link.href = canvas.toDataURL();
                 link.click();
                 setExporting(false);
             };
 
             const exportExcel = () => {
-                const data = [["กลุ่ม:", activeGroup.name], ["ยอดรวม:", totalSpent], [], ["รายการ", "เงิน", "คนจ่าย", "คนหาร"], ...expenses.map(e => [e.description, e.amount, e.payer, e.participants.join(', ')]), [], ["จาก", "ไปหา", "ยอด"]];
+                const data = [["กลุ่ม:", activeGroup.name], ["ยอดรวม:", totalSpent], [], ["รายการ", "จำนวนเงิน", "คนจ่าย", "คนร่วมหาร"], ...expenses.map(e => [e.description, e.amount, e.payer, e.participants.join(', ')]), [], ["ผู้โอน", "ผู้รับโอน", "ยอดโอน"]];
                 settlements.forEach(s => data.push([s.from, s.to, s.amount]));
                 const ws = XLSX.utils.aoa_to_sheet(data);
                 const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Summary");
-                XLSX.writeFile(wb, `${activeGroup.name}_Bill.xlsx`);
+                XLSX.utils.book_append_sheet(wb, ws, "สรุปบิล");
+                XLSX.writeFile(wb, `${activeGroup.name}_Expenses.xlsx`);
+            };
+
+            // Avatar component
+            const Avatar = ({ name, size = "md" }) => {
+                const sizeClasses = {
+                    sm: "w-6 h-6 text-[8px]",
+                    md: "w-10 h-10 text-[14px]",
+                    lg: "w-14 h-14 text-[20px]"
+                };
+                return (
+                    <div 
+                        style={{ backgroundColor: getMemberColor(name) }} 
+                        className={`${sizeClasses[size]} rounded-2xl flex items-center justify-center font-bold text-[#232946] border-2 border-white shadow-sm shrink-0`}
+                    >
+                        {name[0].toUpperCase()}
+                    </div>
+                );
             };
 
             if (loading && !user) return <div className="h-screen flex items-center justify-center pastel-gradient"><div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div></div>;
@@ -263,11 +292,11 @@
                         <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-xl">
                             <span className="text-5xl">🧸</span>
                         </div>
-                        <h1 className="text-4xl font-bold mb-2 text-[#232946]">Bill with Friends</h1>
-                        <p className="text-slate-500 mb-10 font-medium">มาจดบิลกับเพื่อนแบบนุ่มฟูกันเถอะ!</p>
+                        <h1 className="text-4xl font-bold mb-2 text-[#232946]">หารเงินกับเพื่อน</h1>
+                        <p className="text-slate-500 mb-10 font-medium">จัดการค่าใช้จ่ายกลุ่มเพื่อนแบบน่ารัก!</p>
                         <button onClick={handleLogin} className="w-full py-5 bg-[#EEBBC3] text-[#232946] rounded-3xl font-bold flex items-center justify-center gap-3 hover:bg-[#e8a9b4] transition-all btn-glow shadow-lg border-b-4 border-[#d69fa8]">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 bg-white rounded-full p-1" />
-                            Log in with Google
+                            เข้าใช้งานด้วย Google
                         </button>
                     </div>
                 </div>
@@ -284,7 +313,9 @@
                                         <i data-lucide="chevron-left" className="w-5 h-5 text-[#232946]"></i>
                                     </button>
                                 )}
-                                <h1 className="text-2xl font-bold text-[#232946]">{view === 'list' ? 'ตี้ทั้งหมด' : activeGroup?.name}</h1>
+                                <h1 className="text-2xl font-bold text-[#232946] truncate max-w-[150px] sm:max-w-none">
+                                    {view === 'list' ? 'ตี้ของฉัน' : activeGroup?.name}
+                                </h1>
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="text-right hidden sm:block">
@@ -296,7 +327,7 @@
                                     <button 
                                         onClick={handleLogout}
                                         className="absolute -top-2 -right-2 bg-red-400 text-white p-1.5 rounded-full border-2 border-white shadow-md hover:bg-red-500 transition-colors"
-                                        title="Log out"
+                                        title="ออกจากระบบ"
                                     >
                                         <i data-lucide="log-out" className="w-3 h-3"></i>
                                     </button>
@@ -309,12 +340,12 @@
                         {view === 'list' ? (
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center px-2">
-                                    <h2 className="text-xl font-bold text-slate-500">เลือกตี้ที่ต้องการ</h2>
+                                    <h2 className="text-xl font-bold text-slate-500">เลือกกลุ่มที่ต้องการ</h2>
                                     <button 
                                         onClick={() => setShowAddGroup(true)} 
                                         className="bg-[#B8C1EC] text-[#232946] px-6 py-3 rounded-3xl font-bold shadow-lg shadow-[#B8C1EC]/30 btn-glow border-b-4 border-[#a5add4]"
                                     >
-                                        + เปิดตี้ใหม่
+                                        + เปิดกลุ่มใหม่
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -324,117 +355,156 @@
                                             <h3 className="text-2xl font-bold text-[#232946]">{g.name}</h3>
                                             <div className="flex items-center gap-2 mt-2">
                                                 <div className="flex -space-x-2">
-                                                    {g.members.slice(0,3).map((m, i) => (
-                                                        <div key={i} className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-bold shadow-sm">{m[0]}</div>
+                                                    {g.members.slice(0,5).map((m, i) => (
+                                                        <div 
+                                                            key={i} 
+                                                            style={{ backgroundColor: getMemberColor(m) }}
+                                                            className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold shadow-sm"
+                                                        >
+                                                            {m[0].toUpperCase()}
+                                                        </div>
                                                     ))}
                                                 </div>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{g.members.length} Members</span>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{g.members.length} คนในกลุ่ม</span>
                                             </div>
                                         </div>
                                     ))}
                                     {groups.length === 0 && (
                                         <div className="col-span-full py-20 text-center glass-card border-dashed border-4 border-white opacity-60">
-                                            <p className="text-xl font-bold text-slate-400">ยังไม่มีตี้เลย มาเริ่มกันเถอะ! ✨</p>
+                                            <p className="text-xl font-bold text-slate-400">ยังไม่ได้เริ่มหารเงินกับเพื่อนเลย มาเปิดกลุ่มแรกกัน! ✨</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-8">
-                                {/* Stats */}
+                                {/* Stats & Adding Member */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div className="md:col-span-2 glass-card p-10 bg-gradient-to-br from-[#B8C1EC] to-[#A0C4FF] text-[#232946] shadow-xl relative overflow-hidden">
                                         <div className="relative z-10">
-                                            <h4 className="text-xs font-bold uppercase tracking-widest mb-2 opacity-70">ยอดรวมค่าเสียหาย</h4>
+                                            <h4 className="text-xs font-bold uppercase tracking-widest mb-2 opacity-70">ยอดเงินรวมทั้งหมด</h4>
                                             <h2 className="text-5xl font-black">฿{formatMoney(totalSpent)}</h2>
                                             <div className="flex flex-wrap gap-2 mt-8">
                                                 {activeGroup.members.map(m => (
-                                                    <div key={m} className="bg-white/40 px-4 py-1.5 rounded-full text-xs font-bold backdrop-blur-md border border-white/50">{m}</div>
+                                                    <div key={m} className="flex items-center gap-1.5 bg-white/40 pl-1.5 pr-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border border-white/50">
+                                                        <div style={{backgroundColor: getMemberColor(m)}} className="w-4 h-4 rounded-lg border border-white shrink-0"></div>
+                                                        {m}
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="absolute -bottom-10 -right-10 opacity-10 rotate-12"><i data-lucide="wallet" className="w-64 h-64"></i></div>
                                     </div>
-                                    <div className="glass-card p-8 flex flex-col justify-between border-2 border-white">
-                                        <div>
-                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">ชาวแก๊ง ({activeGroup.members.length})</h4>
-                                            <div className="flex flex-wrap gap-2 mb-6 max-h-32 overflow-y-auto no-scrollbar">
-                                                {activeGroup.members.map(m => (
-                                                    <div key={m} className="flex items-center gap-2 bg-[#FDFBF9] pl-3 pr-2 py-1.5 rounded-2xl border border-slate-100 group/m">
-                                                        <span className="font-bold text-xs">{m}</span>
-                                                        <button onClick={() => removeMember(m)} className="text-red-300 hover:text-red-500 opacity-0 group-hover/m:opacity-100 transition-opacity"><i data-lucide="x" className="w-3 h-3"></i></button>
+                                    
+                                    <div className="glass-card p-8 flex flex-col border-2 border-white min-h-[300px]">
+                                        <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">ชาวแก๊งที่หารกัน ({activeGroup.members.length})</h4>
+                                        <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 mb-6">
+                                            {activeGroup.members.map(m => (
+                                                <div key={m} className="flex items-center justify-between bg-white/60 pl-2 pr-3 py-2 rounded-2xl border border-white group/m">
+                                                    <div className="flex items-center gap-3">
+                                                        <Avatar name={m} size="sm" />
+                                                        <span className="font-bold text-sm">{m}</span>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                    <button onClick={() => removeMember(m)} className="text-red-300 hover:text-red-500 opacity-0 group-hover/m:opacity-100 transition-opacity p-1"><i data-lucide="x" className="w-4 h-4"></i></button>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <div className="flex gap-2">
-                                            <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="เพิ่มเพื่อน..." className="w-full bg-[#FDFBF9] px-4 py-3 rounded-2xl outline-none text-xs font-bold border border-slate-100 focus:ring-2 ring-[#B8C1EC]/50 transition-all" />
-                                            <button onClick={addMember} className="bg-[#EEBBC3] text-[#232946] p-3 rounded-2xl shadow-md active:scale-90 transition-all"><i data-lucide="plus" className="w-5 h-5"></i></button>
+                                        {/* Large Add Member Input */}
+                                        <div className="space-y-3 pt-4 border-t border-white/40">
+                                            <p className="text-[10px] font-bold text-blue-400 text-center uppercase tracking-widest leading-none">ดึงเพื่อนเข้าตี้เพิ่ม</p>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    value={newMemberName} 
+                                                    onChange={e => setNewMemberName(e.target.value)} 
+                                                    placeholder="พิมพ์ชื่อเพื่อน..." 
+                                                    className="w-full bg-[#FDFBF9] px-4 py-4 rounded-2xl outline-none text-md font-bold border-2 border-slate-50 focus:border-[#B8C1EC] transition-all placeholder:text-slate-300 shadow-inner" 
+                                                />
+                                                <button onClick={addMember} className="bg-[#EEBBC3] text-[#232946] px-5 rounded-2xl shadow-md active:scale-90 transition-all border-b-4 border-[#d69fa8]"><i data-lucide="user-plus" className="w-6 h-6"></i></button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Debt Settlement */}
+                                {/* Who pays whom? (Settlement) */}
                                 <div className="glass-card p-10 border-2 border-white shadow-xl relative overflow-hidden">
                                     <div className="flex justify-between items-center mb-8 relative z-10">
-                                        <h3 className="text-2xl font-bold flex items-center gap-3 text-[#232946]"><i data-lucide="zap" className="text-[#FFD6A5] fill-[#FFD6A5] w-6 h-6"></i> สรุปดีลหนี้เพื่อนรัก</h3>
+                                        <h3 className="text-2xl font-bold flex items-center gap-3 text-[#232946]"><i data-lucide="arrow-right-left" className="text-[#FFD6A5] w-6 h-6"></i> ใครต้องโอนให้ใคร</h3>
                                         <div className="flex gap-3">
-                                            <button onClick={exportImage} className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400 hover:text-[#B8C1EC]"><i data-lucide="image" className="w-5 h-5"></i></button>
-                                            <button onClick={exportExcel} className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400 hover:text-[#CAFFBF]"><i data-lucide="file-spreadsheet" className="w-5 h-5"></i></button>
+                                            <button onClick={exportImage} title="บันทึกรูปภาพ" className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400 hover:text-[#B8C1EC]"><i data-lucide="image" className="w-5 h-5"></i></button>
+                                            <button onClick={exportExcel} title="โหลดเป็น Excel" className="p-3 bg-white hover:bg-slate-50 rounded-2xl shadow-md transition-all text-slate-400 hover:text-[#CAFFBF]"><i data-lucide="file-spreadsheet" className="w-5 h-5"></i></button>
                                         </div>
                                     </div>
                                     <div className="space-y-4 relative z-10">
                                         {settlements.map((s, i) => (
-                                            <div key={i} className="flex items-center justify-between bg-white/60 p-5 rounded-[2rem] border border-white shadow-sm animate-pop">
-                                                <div className="flex items-center gap-4">
-                                                    <span className="font-bold text-lg px-4 py-2 bg-[#FDFBF9] rounded-2xl shadow-inner">{s.from}</span>
-                                                    <i data-lucide="arrow-right" className="text-slate-300 w-5 h-5"></i>
-                                                    <span className="font-bold text-lg px-4 py-2 bg-[#FDFBF9] rounded-2xl shadow-inner">{s.to}</span>
+                                            <div key={i} className="flex items-center justify-between bg-white/60 p-5 rounded-[2rem] border-2 border-white shadow-sm animate-pop">
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <Avatar name={s.from} />
+                                                        <span className="font-bold text-xs">{s.from}</span>
+                                                    </div>
+                                                    <div className="flex-1 flex flex-col items-center">
+                                                        <i data-lucide="arrow-right" className="text-slate-300 w-6 h-6"></i>
+                                                        <span className="text-[10px] font-bold text-blue-300 uppercase tracking-tighter">ต้องโอนให้</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <Avatar name={s.to} />
+                                                        <span className="font-bold text-xs">{s.to}</span>
+                                                    </div>
                                                 </div>
-                                                <span className="text-2xl font-black text-[#A0C4FF]">฿{formatMoney(s.amount)}</span>
+                                                <div className="text-right pl-6">
+                                                    <span className="text-2xl font-black text-[#A0C4FF] whitespace-nowrap">฿{formatMoney(s.amount)}</span>
+                                                </div>
                                             </div>
                                         ))}
                                         {settlements.length === 0 && (
                                             <div className="text-center py-10">
                                                 <span className="text-4xl mb-4 block">✨</span>
-                                                <p className="text-slate-400 font-bold italic">ทุกคนแฮปปี้ ไม่มีหนี้ค้างจ้า!</p>
+                                                <p className="text-slate-400 font-bold italic">เคลียร์กันครบทุกคนแล้ว แฮปปี้สุดๆ!</p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Expenses Section */}
+                                {/* Transaction History */}
                                 <div className="space-y-6">
-                                    <div className="flex justify-between items-center px-2">
-                                        <h3 className="text-2xl font-bold text-[#232946]">ประวัติสายเปย์</h3>
+                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 px-2">
+                                        <h3 className="text-2xl font-bold text-[#232946]">รายการที่จ่ายไปแล้ว</h3>
                                         <button 
                                             onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer(activeGroup.members[0]); setExpParticipants(activeGroup.members); setShowExpenseModal(true); }} 
-                                            className="bg-[#EEBBC3] text-[#232946] px-8 py-4 rounded-3xl font-bold shadow-xl shadow-[#EEBBC3]/30 btn-glow border-b-4 border-[#d69fa8]"
+                                            className="w-full sm:w-auto bg-[#EEBBC3] text-[#232946] px-12 py-5 rounded-[2rem] font-bold text-xl shadow-xl shadow-[#EEBBC3]/30 btn-glow border-b-4 border-[#d69fa8] flex items-center justify-center gap-2"
                                         >
-                                            + จัดไป! เพิ่มบิล
+                                            <i data-lucide="plus-circle" className="w-6 h-6"></i> เพิ่มรายการใหม่
                                         </button>
                                     </div>
                                     <div className="grid gap-4">
                                         {expenses.map(e => (
                                             <div key={e.id} className="glass-card p-6 flex items-center justify-between group hover:border-[#B8C1EC] transition-all border-2 border-white animate-pop shadow-md hover:shadow-xl">
                                                 <div className="flex items-center gap-5">
-                                                    <div className="w-14 h-14 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-inner border border-slate-50">
-                                                        {partyEmojis[Math.floor(Math.random() * partyEmojis.length)]}
+                                                    <div className="relative">
+                                                        <Avatar name={e.payer} size="md" />
+                                                        <div className="absolute -bottom-1 -right-1 bg-white p-1 rounded-lg border border-slate-100 shadow-sm text-xs">
+                                                            {partyEmojis[Math.floor((e.description.length) % partyEmojis.length)]}
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-bold text-xl text-[#232946]">{e.description}</h4>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">Paid by</span>
-                                                            <span className="text-xs font-bold text-[#B8C1EC] leading-none">{e.payer}</span>
+                                                        <h4 className="font-bold text-xl text-[#232946] leading-none mb-1">{e.description}</h4>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">คนจ่าย:</span>
+                                                            <span className="text-sm font-bold text-[#B8C1EC] leading-none">{e.payer}</span>
                                                             <span className="text-slate-200">|</span>
-                                                            <span className="text-[10px] font-bold text-slate-300 uppercase leading-none">{e.participants.length} People</span>
+                                                            <span className="text-[10px] font-bold text-slate-300 uppercase leading-none">หาร {e.participants.length} คน</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-6">
                                                     <div className="text-right">
                                                         <p className="text-2xl font-black text-[#232946]">฿{formatMoney(e.amount)}</p>
-                                                        <p className="text-[10px] font-bold text-slate-300 italic">หารคนละ ฿{formatMoney(e.amount / e.participants.length)}</p>
+                                                        <div className="flex justify-end gap-1 mt-1">
+                                                            {e.participants.slice(0,3).map((p, idx) => (
+                                                                <div key={idx} style={{backgroundColor: getMemberColor(p)}} className="w-3 h-3 rounded-full border border-white"></div>
+                                                            ))}
+                                                            {e.participants.length > 3 && <span className="text-[8px] font-bold text-slate-300">+{e.participants.length-3}</span>}
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-2 bg-white rounded-xl shadow-sm text-blue-300 hover:text-blue-500 transition-colors"><i data-lucide="edit-3" className="w-4 h-4"></i></button>
@@ -449,37 +519,37 @@
                         )}
                     </main>
 
-                    {/* Add Group Modal */}
+                    {/* Modals - Same logic but pretty UI */}
                     {showAddGroup && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#232946]/40 backdrop-blur-md animate-pop">
                             <div className="bg-white w-full max-w-sm rounded-[3rem] p-12 shadow-2xl border-4 border-[#EEBBC3] text-center">
                                 <span className="text-5xl block mb-6 animate-bounce">🎈</span>
-                                <h3 className="text-3xl font-bold mb-2 text-[#232946]">เปิดตี้ใหม่</h3>
+                                <h3 className="text-3xl font-bold mb-2 text-[#232946]">เปิดกลุ่มใหม่</h3>
                                 <p className="text-slate-400 mb-8 font-medium">ทริปนี้หรือวันนี้จะใช้ชื่อว่าอะไรดีคะ?</p>
-                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="เช่น ทริปญี่ปุ่น 2025" className="w-full bg-[#FDFBF9] border-2 border-slate-100 px-6 py-5 rounded-3xl outline-none focus:ring-4 ring-[#EEBBC3]/20 font-bold mb-8 text-lg text-center" />
+                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="เช่น ทริปเที่ยวหัวหิน..." className="w-full bg-[#FDFBF9] border-2 border-slate-100 px-6 py-5 rounded-3xl outline-none focus:ring-4 ring-[#EEBBC3]/20 font-bold mb-8 text-lg text-center" />
                                 <div className="space-y-3">
-                                    <button onClick={createGroup} className="w-full bg-[#EEBBC3] text-[#232946] py-5 rounded-3xl font-bold shadow-xl btn-glow transition-all border-b-4 border-[#d69fa8]">เริ่มสร้างตี้กันเลย!</button>
-                                    <button onClick={() => setShowAddGroup(false)} className="w-full py-2 text-slate-300 font-bold hover:text-slate-500">ไว้ก่อนนะ</button>
+                                    <button onClick={createGroup} className="w-full bg-[#EEBBC3] text-[#232946] py-5 rounded-3xl font-bold shadow-xl btn-glow transition-all border-b-4 border-[#d69fa8]">เริ่มสร้างกลุ่มเลย!</button>
+                                    <button onClick={() => setShowAddGroup(false)} className="w-full py-2 text-slate-300 font-bold hover:text-slate-500">ไว้ก่อนจ้า</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Expense Modal */}
+                    {/* Expense Modal with Avatars */}
                     {showExpenseModal && (
                         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-[#232946]/40 backdrop-blur-md animate-pop">
                             <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[4rem] p-10 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#B8C1EC]">
                                 <div className="flex justify-between items-center mb-8">
-                                    <h3 className="text-3xl font-bold text-[#232946]">{editingExpense ? 'แก้ไขบิล' : 'เพิ่มรายการใหม่'}</h3>
+                                    <h3 className="text-3xl font-bold text-[#232946]">{editingExpense ? 'แก้ข้อมูลบิล' : 'จ่ายค่าอะไรไปบ้าง'}</h3>
                                     <button onClick={() => setShowExpenseModal(false)} className="p-3 bg-slate-50 rounded-full hover:bg-slate-100"><i data-lucide="x" className="w-6 h-6"></i></button>
                                 </div>
                                 <div className="space-y-8">
                                     <div className="bg-[#B8C1EC]/10 p-6 rounded-[2.5rem] border-2 border-[#B8C1EC]/20 shadow-inner">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">จ่ายค่าอะไรไปคะ?</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">จ่ายค่าอะไรคะ?</label>
                                         <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าที่พัก, ค่าน้ำส้ม" className="w-full bg-white px-4 py-3 rounded-2xl outline-none font-bold text-lg border border-white" />
                                     </div>
                                     <div className="bg-[#FFD6A5]/10 p-6 rounded-[2.5rem] border-2 border-[#FFD6A5]/20 shadow-inner">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">กี่บาทคะ? (คำนวณได้นะ)</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">กี่บาทคะ? (พิมพ์บวกลบได้นะ)</label>
                                         <div className="relative">
                                             <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0" className="w-full bg-white px-6 py-5 rounded-2xl outline-none font-black text-3xl text-[#A0C4FF] pr-32 border border-white" />
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 bg-[#FDFBF9] px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
@@ -487,23 +557,36 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">ใครสายเปย์?</label>
-                                            <select value={expPayer} onChange={e => setExpPayer(e.target.value)} className="w-full bg-[#FDFBF9] px-4 py-4 rounded-2xl outline-none font-bold text-sm border-2 border-slate-50">
-                                                {activeGroup.members.map(m => <option key={m} value={m}>{m}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">ปุ่มลัด</label>
-                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="w-full bg-[#A0C4FF]/10 text-[#A0C4FF] py-4 rounded-2xl border-2 border-[#A0C4FF]/20 font-bold text-[10px] uppercase tracking-wider">หารทุกคน</button>
+                                    
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">ใครเป็นคนเปย์?</label>
+                                        <div className="flex overflow-x-auto gap-3 pb-2 no-scrollbar">
+                                            {activeGroup.members.map(m => (
+                                                <button 
+                                                    key={m} 
+                                                    onClick={() => setExpPayer(m)} 
+                                                    className={`shrink-0 flex flex-col items-center gap-2 p-3 rounded-[2rem] border-2 transition-all ${expPayer === m ? 'bg-white border-[#B8C1EC] shadow-md scale-105' : 'border-transparent opacity-60'}`}
+                                                >
+                                                    <Avatar name={m} />
+                                                    <span className="text-[10px] font-bold">{m}</span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-4">หารกับใครบ้าง? ({expParticipants.length} คน)</label>
+
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ใครร่วมหารบ้าง? ({expParticipants.length} คน)</label>
+                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="text-[10px] font-bold text-blue-400 border border-blue-100 px-3 py-1 rounded-full hover:bg-blue-50 transition-colors">หารทุกคน</button>
+                                        </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             {activeGroup.members.map(m => (
-                                                <button key={m} onClick={() => expParticipants.includes(m) ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])} className={`px-4 py-4 rounded-2xl font-bold border-2 transition-all text-sm ${expParticipants.includes(m) ? 'bg-[#EEBBC3] border-[#EEBBC3] text-[#232946] shadow-lg shadow-[#EEBBC3]/20' : 'bg-[#FDFBF9] border-slate-50 text-slate-400'}`}>{m}</button>
+                                                <button key={m} onClick={() => expParticipants.includes(m) ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])} className={`flex items-center gap-3 px-4 py-4 rounded-2xl font-bold border-2 transition-all text-sm ${expParticipants.includes(m) ? 'bg-[#EEBBC3] border-[#EEBBC3] text-[#232946] shadow-lg shadow-[#EEBBC3]/20' : 'bg-[#FDFBF9] border-slate-50 text-slate-400'}`}>
+                                                    <div style={{backgroundColor: expParticipants.includes(m) ? 'white' : getMemberColor(m)}} className="w-5 h-5 rounded-lg shrink-0 border border-white flex items-center justify-center text-[8px]">
+                                                        {m[0].toUpperCase()}
+                                                    </div>
+                                                    <span className="truncate">{m}</span>
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -518,14 +601,14 @@
                         <div className="glass-card p-10 border-4 border-white shadow-2xl text-center">
                             <span className="text-4xl block mb-2">🎀</span>
                             <h1 className="text-4xl font-bold mb-1 text-[#232946]">{activeGroup?.name}</h1>
-                            <p className="text-[#A0C4FF] font-black text-lg mb-10 tracking-widest uppercase">Summary Report</p>
+                            <p className="text-[#A0C4FF] font-black text-lg mb-10 tracking-widest uppercase">ใบสรุปยอดเงินเพื่อนรัก</p>
                             <div className="text-left space-y-6">
                                 <div className="bg-[#B8C1EC]/10 p-6 rounded-[2rem] border-2 border-white shadow-inner">
-                                    <h3 className="font-bold text-[#232946] mb-1">ค่าใช้จ่ายรวมทั้งหมด</h3>
+                                    <h3 className="font-bold text-[#232946] mb-1">ยอดรวมทั้งหมด</h3>
                                     <p className="text-4xl font-black text-[#232946]">฿{formatMoney(totalSpent)}</p>
                                 </div>
                                 <div className="space-y-3">
-                                    <h3 className="font-bold border-l-8 border-[#EEBBC3] pl-4 text-[#232946] ml-2">ดีลหนี้เพื่อนรัก</h3>
+                                    <h3 className="font-bold border-l-8 border-[#EEBBC3] pl-4 text-[#232946] ml-2">ใครต้องโอนให้ใคร</h3>
                                     {settlements.map((s, i) => (
                                         <div key={i} className="flex justify-between bg-white/70 p-5 rounded-2xl border-2 border-white shadow-sm">
                                             <span className="font-bold text-[#232946]">{s.from} ➜ {s.to}</span>
@@ -533,7 +616,7 @@
                                         </div>
                                     ))}
                                 </div>
-                                <p className="text-[10px] text-center text-slate-300 mt-12 font-bold tracking-widest uppercase italic">Generated by Expense Pro Cloud ✨</p>
+                                <p className="text-[10px] text-center text-slate-300 mt-12 font-bold tracking-widest uppercase italic">สรุปโดยระบบ Expense Pro Cloud ✨</p>
                             </div>
                         </div>
                     </div>
