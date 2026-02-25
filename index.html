@@ -180,6 +180,9 @@
             const [expAmount, setExpAmount] = useState('');
             const [expPayer, setExpPayer] = useState('');
             const [expParticipants, setExpParticipants] = useState([]);
+            
+            // State ใหม่สำหรับจับ Error หน้า Dashboard จะได้ไม่จอขาว
+            const [dashError, setDashError] = useState('');
 
             // 1. Auth Init
             useEffect(() => {
@@ -223,13 +226,17 @@
                         if (doc.exists) {
                             setActiveGroup({ id: doc.id, ...doc.data() });
                             setView('dashboard');
+                            setDashError('');
                         } else {
-                            alert("ลิงก์แดชบอร์ดไม่ถูกต้อง หรือกลุ่มนี้ถูกลบไปแล้วครับ");
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                            setView('list');
+                            setDashError("ลิงก์แดชบอร์ดไม่ถูกต้อง หรือกลุ่มนี้ถูกลบไปแล้วครับ");
                         }
                     }, (err) => {
                         console.error("Dashboard Fetch Error:", err);
+                        if (err.message && err.message.includes('permission')) {
+                            setDashError("เซิร์ฟเวอร์ปฏิเสธการเข้าถึงข้อมูล (Permission Denied) 🔒 โปรดล็อกอินเพื่อดูข้อมูล หรือตรวจสอบกฎ Firestore Rules");
+                        } else {
+                            setDashError("เกิดข้อผิดพลาดในการโหลดข้อมูลทริป ❌");
+                        }
                     });
                 }
                 return () => unsubscribe();
@@ -791,8 +798,9 @@
 
             if (loading) return <div className="h-screen flex items-center justify-center"><div className="loader"></div></div>;
 
-            // หน้าจอ Login (บังคับล็อกอินด้วย Google ยกเว้นเข้ามาทางลิงก์ Dashboard)
-            if ((!user || user.isAnonymous) && !dashIdFromUrl && view !== 'dashboard') {
+            // หน้าจอ Login (บังคับล็อกอินด้วย Google ยกเว้นเข้ามาทางลิงก์ Dashboard ด้วย Anonymous สำเร็จ)
+            // เช็คครอบคลุมกรณี Auth ล้มเหลวทั้งหมด (user เป็น null) จะบังคับแสดง Login Screen ทันที เพื่อไม่ให้จอขาว
+            if (!user || (user.isAnonymous && !dashIdFromUrl && view !== 'dashboard')) {
                 return (
                     <div className="h-screen flex items-center justify-center p-6 animate-pop">
                         <div className="glass-card p-10 text-center max-w-sm w-full shadow-2xl">
@@ -902,9 +910,34 @@
                             </div>
                         )}
 
+                        {/* Loading / Error States สำหรับ Dashboard (แก้ปัญหาเปิดหน้ามาแล้วจอขาว) */}
+                        {view === 'dashboard' && !activeGroup && !dashError && (
+                            <div className="py-32 text-center flex flex-col items-center justify-center animate-pop">
+                                <div className="loader mb-6 border-[#FFB6C1]"></div>
+                                <p className="font-bold text-[#2B3A4A] text-xl">กำลังโหลดข้อมูลแดชบอร์ด...</p>
+                                <p className="text-sm text-slate-500 mt-2">ประมวลผลสรุปยอดใช้จ่ายทริป</p>
+                            </div>
+                        )}
+
+                        {view === 'dashboard' && !activeGroup && dashError && (
+                            <div className="py-20 text-center animate-pop">
+                                <div className="glass-card p-10 max-w-md mx-auto shadow-xl bg-white/80">
+                                    <div className="text-7xl mb-6">🔒</div>
+                                    <h3 className="text-2xl font-bold text-[#2B3A4A] mb-3">ไม่สามารถแสดงข้อมูลได้</h3>
+                                    <p className="text-slate-500 font-medium mb-8 leading-relaxed">{dashError}</p>
+                                    {user?.isAnonymous && (
+                                        <button onClick={handleLogin} className="btn-primary w-full py-4 px-6 flex items-center justify-center gap-3 font-bold shadow-md text-base">
+                                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-1" />
+                                            ล็อกอินด้วย Google เพื่อยืนยันตัวตน
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* 2. หน้า Dashboard แบบอ่านอย่างเดียว (แชร์ให้เพื่อนดูโดยไม่ต้อง Login) */}
                         {view === 'dashboard' && activeGroup && (
-                            <div className="space-y-6 pb-20">
+                            <div className="space-y-6 pb-20 animate-pop">
                                 {/* Dashboard Hero */}
                                 <div className="glass-card p-8 relative overflow-hidden bg-gradient-to-br from-white/70 to-white/40 shadow-xl border-white/80 text-center">
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 overflow-hidden mix-blend-multiply">
