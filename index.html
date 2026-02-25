@@ -637,7 +637,7 @@
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                     {groups.map(g => (
                                         <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-5 cursor-pointer relative group/card hover:shadow-xl hover:-translate-y-1 transition-all bg-white/40 flex flex-col justify-between min-h-[160px]">
-                                            <button onClick={(e) => deleteGroup(g.id, e)} className="absolute top-4 right-4 text-slate-400 bg-white/60 hover:bg-red-100 hover:text-red-500 rounded-full p-2 z-10 transition-all shadow-sm backdrop-blur-sm"><LucideIcon name="trash-2" className="w-4 h-4" /></button>
+                                            <button onClick={(e) => deleteGroup(g.id, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-400 opacity-0 group-hover/card:opacity-100 transition-opacity p-2 z-10"><LucideIcon name="trash-2" className="w-5 h-5" /></button>
                                             
                                             <div className="flex items-center gap-5">
                                                 {/* ไอคอนกลุ่มขนาด XL */}
@@ -771,7 +771,7 @@
                                                         <span className="font-bold text-[13px] sm:text-[15px]">{s.from}</span>
                                                     </div>
                                                     <div className="flex-1 flex justify-center px-1">
-                                                        <div className="bg-[#E0F7FA] text-[#ADD8E6] px-2 py-0.5 rounded-full"><LucideIcon name="arrow-right" className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
+                                                        <div className="bg-[#E0F7FA] text-[#55ABC8] px-2.5 py-0.5 rounded-full text-[11px] font-bold">จ่ายให้</div>
                                                     </div>
                                                     <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2.5">
                                                         <Avatar name={s.to} size="md" />
@@ -960,7 +960,7 @@
                                     <div key={idx} className="flex justify-between items-center bg-white p-5 rounded-2xl border-2 border-white shadow-sm">
                                         <div className="flex items-center gap-3">
                                             <span className="font-bold text-base">{s.from}</span>
-                                            <LucideIcon name="arrow-right" className="w-4 h-4 text-slate-300" />
+                                            <span className="text-sm font-bold text-slate-400 mx-2">จ่ายให้</span>
                                             <span className="font-bold text-base">{s.to}</span>
                                         </div>
                                         <span className="font-black text-lg text-[#89CFF0]">฿{formatMoney(s.amount)}</span>
