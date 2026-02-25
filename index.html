@@ -9,15 +9,16 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
-    <script src="https://unpkg.com/lucide@latest" crossorigin></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     
+    <!-- External Libraries for Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase Compat SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Sarabun:wght@300;400;500;600&display=swap');
@@ -30,7 +31,7 @@
             --clr-pink: #EEBBC3;
             --clr-blue: #B8C1EC;
             --clr-ink: #232946;
-            --radius-card: 24px;
+            --radius-card: 28px;
         }
 
         body {
@@ -39,6 +40,7 @@
             color: var(--clr-ink);
             margin: 0;
             overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
         h1, h2, h3, h4 { font-family: var(--font-display); }
@@ -49,16 +51,16 @@
 
         .glass-card {
             background: var(--clr-surface);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
             border: 2px solid white;
             border-radius: var(--radius-card);
-            box-shadow: 0 8px 32px -4px rgba(184, 193, 236, 0.2);
+            box-shadow: 0 12px 40px -8px rgba(184, 193, 236, 0.25);
         }
 
         .btn-primary {
             background: var(--clr-pink);
             border-bottom: 4px solid #d8a5ae;
-            border-radius: 16px;
+            border-radius: 18px;
             transition: all 0.1s;
         }
         .btn-primary:active { transform: translateY(2px); border-bottom-width: 2px; }
@@ -66,29 +68,25 @@
         .btn-secondary {
             background: var(--clr-blue);
             border-bottom: 4px solid #9faad8;
-            border-radius: 16px;
+            border-radius: 18px;
             transition: all 0.1s;
         }
         .btn-secondary:active { transform: translateY(2px); border-bottom-width: 2px; }
 
-        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
         .loader {
-            width: 24px; height: 24px;
-            border: 3px solid #eee; border-top-color: var(--clr-pink);
-            border-radius: 50%; animation: spin 0.8s linear infinite;
+            width: 32px; height: 32px;
+            border: 4px solid #f3f3f3; border-top-color: var(--clr-pink);
+            border-radius: 50%; animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .group-icon-wrapper {
-            width: 80px; height: 80px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 22px; border: 3px solid white;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.05);
-        }
+        /* Export area hidden from view but used for snapshot */
+        #export-area { position: absolute; left: -9999px; top: 0; width: 400px; }
     </style>
 </head>
 <body>
@@ -97,45 +95,41 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Firebase Configuration (Using the provided config)
-        const firebaseConfig = {
-            apiKey: "AIzaSyCwnWHqG__ty3OvDok2o6orgreXOu5LSXk",
-            authDomain: "expense-manager-14564.firebaseapp.com",
-            projectId: "expense-manager-14564",
-            storageBucket: "expense-manager-14564.firebasestorage.app",
-            messagingSenderId: "259280883710",
-            appId: "1:259280883710:web:67d7ce7b1f8e5e196a7aaf",
-            measurementId: "G-68BWRR5K8N"
-        };
-        const appId = "expense-manager-pro-v2"; // Unique version ID
+        // Firebase Setup
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyCwnWHqG__ty3OvDok2o6orgreXOu5LSXk",
+                authDomain: "expense-manager-14564.firebaseapp.com",
+                projectId: "expense-manager-14564",
+                storageBucket: "expense-manager-14564.firebasestorage.app",
+                messagingSenderId: "259280883710",
+                appId: "1:259280883710:web:67d7ce7b1f8e5e196a7aaf"
+            };
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'expense-manager-pro-v2';
 
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Constants for UI
-        const TRAVEL_ICONS = [
-            'map', 'plane', 'mountain', 'palmtree', 'utensils', 
-            'camera', 'tent', 'shopping-bag', 'coffee', 'car', 
-            'hotel', 'ticket', 'compass', 'sun', 'umbrella'
-        ];
+        const TRAVEL_ICONS = ['map', 'plane', 'mountain', 'palmtree', 'utensils', 'camera', 'tent', 'shopping-bag', 'coffee', 'car', 'hotel', 'ticket', 'compass', 'sun', 'umbrella'];
         const PASTEL_COLORS = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF'];
 
         function App() {
             const [user, setUser] = useState(null);
-            const [view, setView] = useState('list'); // 'list' or 'detail'
+            const [view, setView] = useState('list');
             const [groups, setGroups] = useState([]);
             const [activeGroup, setActiveGroup] = useState(null);
             const [expenses, setExpenses] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [exporting, setExporting] = useState(false);
 
-            // Modals
+            // Modals & State
             const [showAddGroup, setShowAddGroup] = useState(false);
             const [showJoinGroup, setShowJoinGroup] = useState(false);
             const [showExpenseModal, setShowExpenseModal] = useState(false);
             const [editingExpense, setEditingExpense] = useState(null);
-
-            // Inputs
             const [newGroupName, setNewGroupName] = useState('');
             const [joinId, setJoinId] = useState('');
             const [newMemberName, setNewMemberName] = useState('');
@@ -144,30 +138,36 @@
             const [expPayer, setExpPayer] = useState('');
             const [expParticipants, setExpParticipants] = useState([]);
 
+            // Rule 3: Auth FIRST
             useEffect(() => {
-                const unsubscribe = auth.onAuthStateChanged(async (u) => {
-                    if (u) {
-                        setUser(u);
-                    } else {
-                        setUser(null);
-                        setLoading(false);
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch (err) {
+                        console.error("Auth Error:", err);
                     }
+                };
+                initAuth();
+                const unsubscribe = auth.onAuthStateChanged((u) => {
+                    setUser(u);
+                    setLoading(false);
                 });
                 return () => unsubscribe();
             }, []);
 
-            // Listen to groups where user is a member
+            // Listen to groups - Rule 1: Strict Paths
             useEffect(() => {
                 if (!user) return;
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
-                
-                // Get groups owned by user OR where user is a member
-                // Note: Firestore rule 2 - filter in memory for simplicity
                 const groupsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
                 
-                return groupsRef.onSnapshot((snap) => {
+                const unsubscribe = groupsRef.onSnapshot((snap) => {
                     const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Simple filter: show groups where user is owner or participant
+                    // Rule 2: Memory filter
                     const myGroups = data.filter(g => g.ownerId === user.uid || g.members.includes(myName));
                     setGroups(myGroups);
                     
@@ -175,26 +175,27 @@
                         const updated = myGroups.find(g => g.id === activeGroup.id);
                         if (updated) setActiveGroup(updated);
                     }
-                    setLoading(false);
-                }, (err) => console.error(err));
+                }, (err) => console.error("Firestore Error:", err));
+                
+                return () => unsubscribe();
             }, [user, activeGroup?.id]);
 
-            // Listen to expenses for active group
+            // Listen to expenses
             useEffect(() => {
                 if (!user || !activeGroup) return;
                 const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
                 
-                return expRef.onSnapshot((snap) => {
+                const unsubscribe = expRef.onSnapshot((snap) => {
                     const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Sort in memory (Rule 2)
                     setExpenses(list.sort((a, b) => b.date - a.date));
-                });
+                }, (err) => console.error(err));
+
+                return () => unsubscribe();
             }, [user, activeGroup?.id]);
 
-            // Refresh Lucide icons
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
 
-            // --- Helper Functions ---
+            // Helpers
             const getGroupStyle = (id = "default") => {
                 let hash = 0;
                 for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
@@ -209,21 +210,28 @@
                 try {
                     const sanitized = str.toString().replace(/[^-+*/().0-9]/g, '');
                     if (!sanitized) return 0;
-                    const res = new Function(`return ${sanitized}`)();
-                    return isNaN(res) ? 0 : res;
+                    return new Function(`return ${sanitized}`)() || 0;
                 } catch (e) { return 0; }
             };
 
-            // --- Actions ---
+            const copyId = () => {
+                if (!activeGroup) return;
+                const el = document.createElement('textarea');
+                el.value = activeGroup.id;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                alert("คัดลอก ID กลุ่มแล้ว ส่งให้เพื่อนเพื่อเข้าร่วมทริปได้เลย! ✈️");
+            };
+
             const handleLogin = async () => {
                 const provider = new firebase.auth.GoogleAuthProvider();
                 await auth.signInWithPopup(provider);
             };
 
-            const handleLogout = () => { if (confirm("ออกจากระบบใช่หรือไม่?")) auth.signOut(); };
-
             const createGroup = async () => {
-                if (!newGroupName.trim()) return;
+                if (!newGroupName.trim() || !user) return;
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                 try {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').add({
@@ -239,24 +247,18 @@
             };
 
             const joinGroup = async () => {
-                if (!joinId.trim()) return;
+                if (!joinId.trim() || !user) return;
                 try {
                     const myName = user.displayName?.split(' ')[0] || 'ฉัน';
-                    const groupDoc = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim()).get();
+                    const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim());
+                    const doc = await groupRef.get();
+                    if (!doc.exists) { alert("ไม่พบกลุ่มนี้ กรุณาตรวจสอบ ID อีกครั้ง"); return; }
                     
-                    if (!groupDoc.exists) {
-                        alert("ไม่พบรหัสกลุ่มนี้ กรุณาตรวจสอบอีกครั้ง");
-                        return;
-                    }
-
-                    const data = groupDoc.data();
-                    if (data.members.includes(myName)) {
-                        alert("คุณอยู่ในกลุ่มนี้อยู่แล้ว");
+                    if (!doc.data().members.includes(myName)) {
+                        await groupRef.update({ members: firebase.firestore.FieldValue.arrayUnion(myName) });
+                        alert(`เข้าร่วมกลุ่ม "${doc.data().name}" สำเร็จ! 🎉`);
                     } else {
-                        await groupDoc.ref.update({
-                            members: firebase.firestore.FieldValue.arrayUnion(myName)
-                        });
-                        alert(`เข้าร่วมกลุ่ม "${data.name}" สำเร็จ!`);
+                        alert("คุณอยู่ในกลุ่มนี้อยู่แล้วครับ");
                     }
                     setJoinId('');
                     setShowJoinGroup(false);
@@ -265,9 +267,9 @@
 
             const deleteGroup = async (id, e) => {
                 e.stopPropagation();
-                if (!confirm("ลบกลุ่มและข้อมูลทั้งหมดถาวร?")) return;
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete();
-                if (activeGroup?.id === id) setView('list');
+                if (confirm("ต้องการลบกลุ่มและข้อมูลทั้งหมดถาวรหรือไม่?")) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete();
+                }
             };
 
             const addMember = async () => {
@@ -279,15 +281,16 @@
             };
 
             const removeMember = async (name) => {
-                if (!confirm(`ลบ ${name} หรือไม่?`)) return;
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
-                    members: firebase.firestore.FieldValue.arrayRemove(name)
-                });
+                if (confirm(`ลบ ${name} ออกจากกลุ่ม?`)) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
+                        members: firebase.firestore.FieldValue.arrayRemove(name)
+                    });
+                }
             };
 
             const saveExpense = async () => {
                 const amount = evaluateMath(expAmount);
-                if (!expDesc || amount <= 0 || !expPayer || expParticipants.length === 0) return;
+                if (!expDesc || amount <= 0 || !expPayer || !activeGroup) return;
                 
                 const data = {
                     description: expDesc, amount, payer: expPayer, participants: expParticipants,
@@ -303,40 +306,59 @@
             };
 
             const deleteExpense = async (id) => {
-                if (!confirm("ลบรายการนี้ใช่หรือไม่?")) return;
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
+                if (confirm("ลบรายการนี้ใช่หรือไม่?")) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
+                }
             };
 
-            const copyId = () => {
-                const el = document.createElement('textarea');
-                el.value = activeGroup.id;
-                document.body.appendChild(el);
-                el.select();
-                document.execCommand('copy');
-                document.body.removeChild(el);
-                alert("คัดลอกรหัสกลุ่มแล้ว ส่งให้เพื่อนได้เลย!");
+            // Exports
+            const exportImage = async () => {
+                setExporting(true);
+                const element = document.getElementById('export-area');
+                element.style.position = "relative";
+                element.style.left = "0";
+                try {
+                    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#FDFBF9' });
+                    const link = document.createElement('a');
+                    link.download = `สรุปยอด_${activeGroup.name}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                } catch (e) { console.error(e); }
+                element.style.position = "absolute";
+                element.style.left = "-9999px";
+                setExporting(false);
             };
 
-            // --- Calculations ---
+            const exportExcel = () => {
+                const data = [
+                    ["กลุ่ม:", activeGroup.name], ["ยอดรวม:", totalSpent], [],
+                    ["รายละเอียด", "จำนวนเงิน", "ผู้จ่าย", "ผู้ร่วมหาร"],
+                    ...expenses.map(e => [e.description, e.amount, e.payer, e.participants.join(', ')]),
+                    [], ["จาก", "ถึง", "จำนวนที่ต้องโอน"]
+                ];
+                settlements.forEach(s => data.push([s.from, s.to, s.amount]));
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "สรุปบิลทริป");
+                XLSX.writeFile(wb, `Expenses_${activeGroup.name}.xlsx`);
+            };
+
+            // Calculations
             const totalSpent = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-
             const settlements = useMemo(() => {
                 if (!activeGroup || activeGroup.members.length < 2) return [];
                 const balances = {};
                 activeGroup.members.forEach(m => balances[m] = 0);
-                
                 expenses.forEach(e => {
                     const share = e.amount / e.participants.length;
                     balances[e.payer] += e.amount;
                     e.participants.forEach(p => { if (balances.hasOwnProperty(p)) balances[p] -= share; });
                 });
-
                 const creditors = [], debtors = [];
                 Object.keys(balances).forEach(n => {
                     if (balances[n] > 0.01) creditors.push({ name: n, amt: balances[n] });
                     else if (balances[n] < -0.01) debtors.push({ name: n, amt: Math.abs(balances[n]) });
                 });
-
                 const res = []; let i = 0, j = 0;
                 while (i < debtors.length && j < creditors.length) {
                     const pay = Math.min(debtors[i].amt, creditors[j].amt);
@@ -348,74 +370,50 @@
                 return res;
             }, [activeGroup, expenses]);
 
-            // --- Sub-Components ---
             const GroupIcon = ({ id, size = "md" }) => {
                 const { color, icon } = getGroupStyle(id);
-                const sizeClass = size === "lg" ? "w-20 h-20" : "w-12 h-12";
-                const iconSize = size === "lg" ? 36 : 20;
+                const s = size === "lg" ? "w-20 h-20" : "w-12 h-12";
                 return (
-                    <div style={{ backgroundColor: color }} className={`${sizeClass} rounded-2xl flex items-center justify-center border-2 border-white shadow-sm shrink-0`}>
-                        <i data-lucide={icon} style={{ width: iconSize, height: iconSize, color: '#232946' }}></i>
+                    <div style={{ backgroundColor: color }} className={`${s} rounded-2xl flex items-center justify-center border-2 border-white shadow-sm shrink-0`}>
+                        <i data-lucide={icon} className="text-[#232946]" style={{ width: size === "lg" ? 36 : 20 }}></i>
                     </div>
                 );
             };
 
-            const Avatar = ({ name, size = "sm" }) => {
-                const sizeClass = size === "sm" ? "w-7 h-7 text-[10px]" : "w-10 h-10 text-xs";
-                const getCol = (n) => PASTEL_COLORS[n.length % PASTEL_COLORS.length];
-                return (
-                    <div style={{ backgroundColor: getCol(name) }} className={`${sizeClass} rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm text-slate-700 shrink-0`}>
-                        {name[0].toUpperCase()}
-                    </div>
-                );
-            };
-
-            if (loading && !user) return <div className="h-screen flex items-center justify-center pastel-gradient"><div className="loader"></div></div>;
-
-            if (!user) return (
-                <div className="h-screen flex items-center justify-center p-6 pastel-gradient">
-                    <div className="glass-card p-10 text-center max-w-sm w-full animate-pop">
-                        <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                            <i data-lucide="palmtree" className="w-12 h-12 text-[#EEBBC3]"></i>
-                        </div>
-                        <h1 className="text-2xl font-bold mb-2">Expense Pro</h1>
-                        <p className="text-sm text-slate-500 mb-8 leading-relaxed">หารค่าทริป จัดการบิลกลุ่ม<br/>ให้น่ารักและง่ายกว่าที่เคย 🧸</p>
-                        <button onClick={handleLogin} className="btn-primary w-full py-4 px-6 flex items-center justify-center gap-3 font-semibold shadow-lg">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" />
-                            เข้าสู่ระบบด้วย Google
-                        </button>
-                    </div>
+            const Avatar = ({ name, size = "sm" }) => (
+                <div style={{ backgroundColor: PASTEL_COLORS[name.length % PASTEL_COLORS.length] }} 
+                     className={`${size === "sm" ? "w-7 h-7 text-[10px]" : "w-10 h-10 text-xs"} rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm text-[#232946] shrink-0`}>
+                    {name[0].toUpperCase()}
                 </div>
             );
+
+            if (loading) return <div className="h-screen flex items-center justify-center pastel-gradient"><div className="loader"></div></div>;
 
             return (
                 <div className="min-h-screen pb-20">
                     <header className="p-4 sticky top-0 z-50">
-                        <div className="max-w-3xl mx-auto glass-card px-4 py-3 flex items-center justify-between">
+                        <div className="max-w-3xl mx-auto glass-card px-5 py-3 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 {view === 'detail' && (
-                                    <button onClick={() => setView('list')} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                                        <i data-lucide="arrow-left" className="w-5 h-5"></i>
-                                    </button>
+                                    <button onClick={() => setView('list')} className="p-2 hover:bg-slate-50 rounded-xl transition-all"><i data-lucide="arrow-left" className="w-5 h-5"></i></button>
                                 )}
                                 <div>
-                                    <h2 className="text-lg font-bold truncate max-w-[150px] sm:max-w-none">
-                                        {view === 'list' ? 'ทริปของฉัน' : activeGroup?.name}
-                                    </h2>
-                                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Cloud Connected</p>
+                                    <h2 className="text-lg font-bold truncate max-w-[180px]">{view === 'list' ? 'ทริปของฉัน' : activeGroup?.name}</h2>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Sync</span>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <div className="text-right hidden sm:block">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">สวัสดี</p>
-                                    <p className="text-sm font-bold">{user.displayName?.split(' ')[0]}</p>
-                                </div>
-                                <div className="relative">
-                                    <img src={user.photoURL} className="w-10 h-10 rounded-2xl border-2 border-white shadow-sm" />
-                                    <button onClick={handleLogout} className="absolute -top-1 -right-1 bg-white p-1 rounded-full shadow-md border border-slate-100 hover:text-red-500 transition-colors">
-                                        <i data-lucide="log-out" className="w-3 h-3"></i>
-                                    </button>
-                                </div>
+                                {!user || user.isAnonymous ? (
+                                    <button onClick={handleLogin} className="text-xs font-bold bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 hover:bg-slate-50">Login</button>
+                                ) : (
+                                    <div className="relative group">
+                                        <img src={user.photoURL} className="w-10 h-10 rounded-2xl border-2 border-white shadow-sm" />
+                                        <button onClick={() => auth.signOut()} className="absolute -top-1 -right-1 bg-white p-1 rounded-full shadow-sm border border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="log-out" className="w-3 h-3"></i></button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </header>
@@ -423,154 +421,142 @@
                     <main className="max-w-3xl mx-auto px-4 mt-4 animate-pop">
                         {view === 'list' ? (
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between gap-3">
-                                    <button onClick={() => setShowAddGroup(true)} className="btn-primary flex-1 py-4 flex items-center justify-center gap-2 font-bold shadow-md">
-                                        <i data-lucide="plus-circle" className="w-5 h-5"></i> สร้างกลุ่มใหม่
-                                    </button>
-                                    <button onClick={() => setShowJoinGroup(true)} className="btn-secondary flex-1 py-4 flex items-center justify-center gap-2 font-bold shadow-md">
-                                        <i data-lucide="users" className="w-5 h-5"></i> เข้าร่วมกลุ่ม
-                                    </button>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowAddGroup(true)} className="btn-primary flex-1 py-4 font-bold shadow-md flex items-center justify-center gap-2"><i data-lucide="plus-circle" className="w-5 h-5"></i> สร้างกลุ่มใหม่</button>
+                                    <button onClick={() => setShowJoinGroup(true)} className="btn-secondary flex-1 py-4 font-bold shadow-md flex items-center justify-center gap-2"><i data-lucide="users" className="w-5 h-5"></i> เข้าทริปเพื่อน</button>
                                 </div>
-
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {groups.map(g => (
-                                        <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }}
-                                            className="glass-card p-5 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all group relative">
-                                            <button onClick={(e) => deleteGroup(g.id, e)} className="absolute top-4 right-4 text-slate-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                            </button>
+                                        <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-6 cursor-pointer relative group/card hover:shadow-2xl hover:-translate-y-1 transition-all">
+                                            <button onClick={(e) => deleteGroup(g.id, e)} className="absolute top-4 right-4 text-slate-200 hover:text-red-400 opacity-0 group-hover/card:opacity-100 transition-opacity"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
                                             <div className="flex items-center gap-4">
                                                 <GroupIcon id={g.id} />
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-lg truncate">{g.name}</h3>
-                                                    <p className="text-xs text-slate-400">สมาชิก {g.members.length} คน</p>
+                                                    <h3 className="font-bold text-lg truncate mb-1">{g.name}</h3>
+                                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{g.members.length} สมาชิก</p>
                                                 </div>
                                             </div>
                                             <div className="mt-4 flex -space-x-2">
-                                                {g.members.slice(0, 5).map((m, i) => <Avatar key={i} name={m} />)}
+                                                {g.members.slice(0, 5).map((m, idx) => <Avatar key={idx} name={m} />)}
                                                 {g.members.length > 5 && <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-bold">+{g.members.length - 5}</div>}
                                             </div>
                                         </div>
                                     ))}
                                     {groups.length === 0 && (
-                                        <div className="col-span-full py-20 text-center opacity-40">
-                                            <i data-lucide="compass" className="w-16 h-16 mx-auto mb-4"></i>
-                                            <p className="font-bold">ยังไม่มีกลุ่มทริป เริ่มสร้างทริปแรกได้เลย!</p>
+                                        <div className="col-span-full py-24 text-center glass-card border-dashed">
+                                            <i data-lucide="compass" className="w-16 h-16 mx-auto mb-4 text-slate-200"></i>
+                                            <p className="font-bold text-slate-400">ยังไม่มีทริป เริ่มสร้างหรือขอ ID เพื่อนได้เลย!</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         ) : (
-                            <div className="space-y-6 pb-20">
-                                {/* Dashboard Info */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="md:col-span-2 glass-card p-6 flex flex-col justify-between min-h-[180px] bg-white">
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">ยอดรวมทริปนี้</p>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-mono bg-slate-100 px-2 py-1 rounded">ID: {activeGroup.id}</span>
-                                                    <button onClick={copyId} className="text-blue-400 hover:text-blue-600"><i data-lucide="copy" className="w-3.5 h-3.5"></i></button>
-                                                </div>
+                            <div className="space-y-6">
+                                {/* Dashboard with Blurred Background */}
+                                <div className="glass-card p-7 relative overflow-hidden bg-white/40 border-white/60">
+                                    <div className="absolute -top-12 -right-12 opacity-15 transform rotate-12 scale-[1.8] pointer-events-none">
+                                        <i data-lucide={getGroupStyle(activeGroup.id).icon} style={{ width: 280, height: 280, color: getGroupStyle(activeGroup.id).color, filter: 'blur(50px)' }}></i>
+                                    </div>
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">ยอดรวมใช้จ่ายทริปนี้</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-mono bg-white/60 px-2 py-1 rounded-lg border border-white/50 shadow-sm">ID: {activeGroup.id}</span>
+                                                <button onClick={copyId} className="bg-white/80 p-1.5 rounded-lg shadow-sm hover:text-blue-500 transition-colors"><i data-lucide="copy" className="w-3.5 h-3.5"></i></button>
                                             </div>
-                                            <h1 className="text-4xl font-bold text-[#232946]">฿{formatMoney(totalSpent)}</h1>
                                         </div>
-                                        <div className="flex flex-wrap gap-2 mt-4">
+                                        <h1 className="text-5xl font-bold mb-6">฿{formatMoney(totalSpent)}</h1>
+                                        <div className="flex flex-wrap gap-2">
                                             {activeGroup.members.map(m => (
-                                                <div key={m} className="bg-white px-3 py-1.5 rounded-full border border-slate-100 flex items-center gap-2 shadow-sm text-xs font-bold">
-                                                    <div style={{backgroundColor: PASTEL_COLORS[m.length % PASTEL_COLORS.length]}} className="w-3 h-3 rounded-full"></div>
+                                                <div key={m} className="bg-white/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white flex items-center gap-2 shadow-sm text-xs font-bold">
+                                                    <div style={{backgroundColor: PASTEL_COLORS[m.length % PASTEL_COLORS.length]}} className="w-2.5 h-2.5 rounded-full"></div>
                                                     {m}
                                                 </div>
                                             ))}
-                                        </div>
-                                    </div>
-                                    <div className="glass-card p-6 flex flex-col">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-4">สมาชิก</h4>
-                                        <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar max-h-[150px]">
-                                            {activeGroup.members.map(m => (
-                                                <div key={m} className="flex items-center justify-between group/m">
-                                                    <div className="flex items-center gap-2">
-                                                        <Avatar name={m} />
-                                                        <span className="text-sm font-bold">{m}</span>
-                                                    </div>
-                                                    <button onClick={() => removeMember(m)} className="opacity-0 group-hover/m:opacity-100 text-red-300 hover:text-red-500"><i data-lucide="x" className="w-3.5 h-3.5"></i></button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-4 flex gap-1">
-                                            <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="+ เพิ่มคน" className="flex-1 bg-slate-50 border-none rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-blue-100" onKeyDown={e => e.key === 'Enter' && addMember()}/>
-                                            <button onClick={addMember} className="bg-blue-400 text-white p-2 rounded-xl"><i data-lucide="plus" className="w-4 h-4"></i></button>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Settlement */}
                                 <div className="glass-card p-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-bold flex items-center gap-2"><i data-lucide="arrow-right-left" className="w-4 h-4 text-orange-300"></i> สรุปการโอนเงิน</h3>
-                                        {settlements.length > 0 && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded-full font-bold">Auto Balanced</span>}
+                                    <div className="flex items-center justify-between mb-5">
+                                        <h3 className="font-bold flex items-center gap-2"><i data-lucide="arrow-right-left" className="w-4 h-4 text-orange-300"></i> สรุปการเคลียร์เงิน</h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={exportImage} className="p-2 bg-white rounded-lg shadow-sm text-slate-400 hover:text-blue-400"><i data-lucide="image" className="w-4 h-4"></i></button>
+                                            <button onClick={exportExcel} className="p-2 bg-white rounded-lg shadow-sm text-slate-400 hover:text-green-500"><i data-lucide="file-spreadsheet" className="w-4 h-4"></i></button>
+                                        </div>
                                     </div>
                                     <div className="space-y-3">
-                                        {settlements.map((s, i) => (
-                                            <div key={i} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-50 shadow-sm animate-pop">
+                                        {settlements.map((s, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-4 bg-white/80 rounded-2xl border border-white shadow-sm animate-pop" style={{animationDelay: `${idx*0.05}s`}}>
                                                 <div className="flex items-center gap-4 flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <Avatar name={s.from} size="md" />
                                                         <span className="font-bold text-sm">{s.from}</span>
                                                     </div>
-                                                    <div className="flex flex-col items-center flex-1 opacity-20">
-                                                        <i data-lucide="arrow-right" className="w-4 h-4"></i>
-                                                    </div>
+                                                    <i data-lucide="arrow-right" className="w-4 h-4 text-slate-100 flex-1 text-center"></i>
                                                     <div className="flex items-center gap-2">
                                                         <Avatar name={s.to} size="md" />
                                                         <span className="font-bold text-sm">{s.to}</span>
                                                     </div>
                                                 </div>
-                                                <div className="pl-4 border-l ml-4 text-right">
-                                                    <p className="text-xs text-slate-400 font-bold uppercase">ต้องโอน</p>
+                                                <div className="pl-6 border-l ml-4 text-right">
+                                                    <p className="text-[9px] text-slate-300 font-bold uppercase">ต้องโอน</p>
                                                     <p className="text-lg font-bold text-blue-500">฿{formatMoney(s.amount)}</p>
                                                 </div>
                                             </div>
                                         ))}
-                                        {settlements.length === 0 && (
-                                            <div className="py-6 text-center opacity-30">
-                                                <p className="text-sm font-bold">ไม่มีรายการค้างชำระ ✨</p>
-                                            </div>
-                                        )}
+                                        {settlements.length === 0 && <div className="py-8 text-center opacity-30 font-bold">ยอดเงินเคลียร์กันลงตัวแล้ว! ✨</div>}
                                     </div>
                                 </div>
 
-                                {/* Expense List */}
+                                {/* Expenses List */}
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-bold">รายการใช้จ่าย</h3>
+                                    <div className="flex justify-between items-center px-1">
+                                        <h3 className="font-bold">บิลทั้งหมด</h3>
                                         <button onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer(activeGroup.members[0]); setExpParticipants(activeGroup.members); setShowExpenseModal(true); }}
-                                            className="btn-primary px-5 py-2.5 text-sm font-bold shadow-md flex items-center gap-2">
-                                            <i data-lucide="plus-circle" className="w-4 h-4"></i> เพิ่มรายการ
-                                        </button>
+                                            className="btn-primary px-5 py-2.5 text-xs font-bold shadow-md flex items-center gap-2"><i data-lucide="plus-circle" className="w-4 h-4"></i> เพิ่มบิล</button>
                                     </div>
                                     <div className="grid gap-3">
                                         {expenses.map(e => (
-                                            <div key={e.id} className="glass-card p-4 flex items-center justify-between group hover:border-blue-100 transition-all">
+                                            <div key={e.id} className="glass-card p-4 flex justify-between items-center group/item bg-white/60">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar name={e.payer} size="md" />
                                                     <div>
-                                                        <h4 className="font-bold text-sm">{e.description}</h4>
-                                                        <p className="text-[10px] text-slate-400"><b>{e.payer}</b> จ่าย • หาร {e.participants.length} คน</p>
+                                                        <h4 className="font-bold text-sm leading-tight">{e.description}</h4>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter"><b>{e.payer}</b> จ่าย • หาร {e.participants.length} คน</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-right">
-                                                        <p className="font-bold">฿{formatMoney(e.amount)}</p>
+                                                        <p className="font-bold text-sm">฿{formatMoney(e.amount)}</p>
                                                         <p className="text-[10px] text-slate-300">{new Date(e.date).toLocaleDateString('th-TH')}</p>
                                                     </div>
-                                                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100">
-                                                        <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-1 hover:text-blue-500"><i data-lucide="edit-3" className="w-3.5 h-3.5"></i></button>
-                                                        <button onClick={() => deleteExpense(e.id)} className="p-1 hover:text-red-500"><i data-lucide="trash-2" className="w-3.5 h-3.5"></i></button>
+                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-1 hover:text-blue-400"><i data-lucide="edit-3" className="w-3.5 h-3.5"></i></button>
+                                                        <button onClick={() => deleteExpense(e.id)} className="p-1 hover:text-red-400"><i data-lucide="trash-2" className="w-3.5 h-3.5"></i></button>
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+
+                                {/* Quick Member Manager */}
+                                <div className="glass-card p-6 bg-slate-50 border-none">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-4">จัดการสมาชิก</h4>
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        {activeGroup.members.map(m => (
+                                            <div key={m} className="bg-white px-3 py-1.5 rounded-xl flex items-center gap-2 border border-slate-100 shadow-sm">
+                                                <Avatar name={m} />
+                                                <span className="text-xs font-bold">{m}</span>
+                                                <button onClick={() => removeMember(m)} className="text-slate-200 hover:text-red-300"><i data-lucide="x" className="w-3 h-3"></i></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMember()} placeholder="ชื่อเพื่อน..." className="flex-1 bg-white rounded-xl px-4 py-2 text-sm outline-none border border-slate-100" />
+                                        <button onClick={addMember} className="bg-blue-400 text-white p-2 rounded-xl"><i data-lucide="plus" className="w-5 h-5"></i></button>
                                     </div>
                                 </div>
                             </div>
@@ -579,25 +565,26 @@
 
                     {/* Modals */}
                     {showAddGroup && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
-                            <div className="glass-card p-8 w-full max-w-sm text-center animate-pop">
-                                <h3 className="text-xl font-bold mb-6">ตั้งชื่อทริปใหม่ ✈️</h3>
-                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="เช่น ทริปเชียงใหม่, ลุยญี่ปุ่น" className="w-full bg-slate-50 rounded-2xl px-5 py-4 text-center font-bold mb-6 outline-none ring-blue-100 focus:ring-4 transition-all" />
-                                <div className="flex gap-2">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-pop">
+                            <div className="glass-card p-8 w-full max-w-sm text-center shadow-2xl">
+                                <h3 className="text-xl font-bold mb-2">ทริปใหม่ไปไหนดี? 🏕️</h3>
+                                <p className="text-xs text-slate-400 mb-6">ระบุชื่อทริปของคุณ</p>
+                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createGroup()} placeholder="เช่น ทริปสเปน 2024" className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-center font-bold mb-6 outline-none ring-blue-100 focus:ring-4 transition-all" />
+                                <div className="flex gap-3">
                                     <button onClick={() => setShowAddGroup(false)} className="flex-1 py-3 font-bold text-slate-400">ยกเลิก</button>
-                                    <button onClick={createGroup} className="btn-primary flex-[2] py-3 font-bold shadow-lg">สร้างกลุ่ม</button>
+                                    <button onClick={createGroup} className="btn-primary flex-[2] py-3 font-bold shadow-lg">สร้างเลย!</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {showJoinGroup && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
-                            <div className="glass-card p-8 w-full max-w-sm text-center animate-pop">
-                                <h3 className="text-xl font-bold mb-6">เข้าร่วมกลุ่มเพื่อน 🤝</h3>
-                                <p className="text-xs text-slate-400 mb-4">กรอก ID ที่เพื่อนส่งให้</p>
-                                <input autoFocus value={joinId} onChange={e => setJoinId(e.target.value)} placeholder="คัดลอก ID มาวางที่นี่..." className="w-full bg-slate-50 rounded-2xl px-5 py-4 text-center font-mono text-sm mb-6 outline-none ring-blue-100 focus:ring-4" />
-                                <div className="flex gap-2">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-pop">
+                            <div className="glass-card p-8 w-full max-w-sm text-center shadow-2xl">
+                                <h3 className="text-xl font-bold mb-2">เข้าทริปเพื่อน ✈️</h3>
+                                <p className="text-xs text-slate-400 mb-6">กรอก ID กลุ่มที่เพื่อนส่งให้</p>
+                                <input autoFocus value={joinId} onChange={e => setJoinId(e.target.value)} onKeyDown={e => e.key === 'Enter' && joinGroup()} placeholder="วาง ID ตรงนี้..." className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-center font-mono text-sm mb-6 outline-none ring-blue-100 focus:ring-4" />
+                                <div className="flex gap-3">
                                     <button onClick={() => setShowJoinGroup(false)} className="flex-1 py-3 font-bold text-slate-400">ยกเลิก</button>
                                     <button onClick={joinGroup} className="btn-secondary flex-[2] py-3 font-bold shadow-lg">เข้าร่วม</button>
                                 </div>
@@ -607,64 +594,81 @@
 
                     {showExpenseModal && (
                         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/20 backdrop-blur-sm">
-                            <div className="bg-white w-full max-w-lg sm:rounded-[32px] rounded-t-[32px] p-8 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#B8C1EC]">
+                            <div className="bg-white w-full max-w-xl sm:rounded-[32px] rounded-t-[32px] p-8 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#EEBBC3] animate-pop">
                                 <div className="flex justify-between items-center mb-8">
-                                    <h3 className="text-xl font-bold">{editingExpense ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'}</h3>
+                                    <h3 className="text-xl font-bold">{editingExpense ? 'แก้ไขบิล' : 'จดบิลใหม่'}</h3>
                                     <button onClick={() => setShowExpenseModal(false)} className="p-2 hover:bg-slate-100 rounded-full"><i data-lucide="x" className="w-6 h-6"></i></button>
                                 </div>
-
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">ชื่อรายการ</label>
-                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าข้าวเช้า, ค่าตั๋วเครื่องบิน" className="w-full bg-slate-50 rounded-2xl px-4 py-3 font-bold outline-none border-2 border-transparent focus:border-blue-100" />
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">จ่ายค่าอะไร?</label>
+                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าข้าวเที่ยง, ค่าตั๋วรถไฟ" className="w-full bg-slate-50 rounded-2xl px-4 py-4 font-bold outline-none border-2 border-transparent focus:border-blue-100" />
                                     </div>
-
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">จำนวนเงิน (ใส่สูตรได้)</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">จำนวนเงิน (฿)</label>
                                         <div className="relative">
-                                            <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0.00" className="w-full bg-slate-50 rounded-2xl px-4 py-4 text-3xl font-bold text-blue-500 outline-none pr-32" />
+                                            <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0.00" className="w-full bg-slate-50 rounded-2xl px-4 py-5 text-4xl font-bold text-blue-500 outline-none pr-36" />
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-right">
-                                                <span className="text-[10px] font-bold text-slate-300 block">รวม</span>
+                                                <span className="text-[10px] font-bold text-slate-300 block">ยอดรวม</span>
                                                 <span className="text-sm font-bold text-slate-500">฿{formatMoney(evaluateMath(expAmount))}</span>
                                             </div>
                                         </div>
                                     </div>
-
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3">ใครเป็นคนจ่าย?</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3">ใครจ่าย?</label>
                                         <div className="flex overflow-x-auto gap-4 pb-2 no-scrollbar">
                                             {activeGroup.members.map(m => (
-                                                <button key={m} onClick={() => setExpPayer(m)} className={`shrink-0 flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${expPayer === m ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-transparent opacity-40'}`}>
+                                                <button key={m} onClick={() => setExpPayer(m)} className={`shrink-0 flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${expPayer === m ? 'border-pink-300 bg-pink-50 shadow-sm' : 'border-transparent opacity-40'}`}>
                                                     <Avatar name={m} size="md" />
                                                     <span className="text-[10px] font-bold">{m}</span>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">หารกับใครบ้าง? ({expParticipants.length} คน)</label>
-                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="text-[10px] font-bold text-blue-500">หารทุกคน</button>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">หารกับใคร? ({expParticipants.length} คน)</label>
+                                            <button onClick={() => setExpParticipants(activeGroup.members)} className="text-[10px] font-bold text-blue-500 underline">หารทุกคน</button>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                             {activeGroup.members.map(m => (
                                                 <button key={m} onClick={() => expParticipants.includes(m) ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])}
                                                     className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all font-bold text-sm ${expParticipants.includes(m) ? 'border-[#EEBBC3] bg-[#EEBBC3]/10' : 'border-slate-50 bg-slate-50 text-slate-300'}`}>
-                                                    <div className={`w-4 h-4 rounded-md border-2 ${expParticipants.includes(m) ? 'bg-white border-white' : 'border-slate-200'} flex items-center justify-center`}>
-                                                        {expParticipants.includes(m) && <i data-lucide="check" className="w-3 h-3 text-[#EEBBC3]"></i>}
+                                                    <div className={`w-4 h-4 rounded-md border-2 ${expParticipants.includes(m) ? 'bg-[#EEBBC3] border-[#EEBBC3]' : 'border-slate-200'} flex items-center justify-center`}>
+                                                        {expParticipants.includes(m) && <i data-lucide="check" className="w-3 h-3 text-white"></i>}
                                                     </div>
-                                                    {m}
+                                                    <span className="truncate">{m}</span>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-
-                                    <button onClick={saveExpense} className="w-full btn-primary py-5 text-lg font-bold shadow-xl mt-4">บันทึกรายการ ✨</button>
+                                    <button onClick={saveExpense} className="w-full btn-primary py-5 text-lg font-bold shadow-xl mt-4">บันทึกบิล ✨</button>
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {/* Export Area (Hidden Container) */}
+                    <div id="export-area" className="p-8 bg-[#FDFBF9]">
+                        <div className="glass-card p-8 border-2 border-white text-center">
+                            <h2 className="text-2xl font-bold mb-1">{activeGroup?.name}</h2>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-8">สรุปรายการใช้จ่ายทริป</p>
+                            <div className="bg-[#B8C1EC]/10 p-6 rounded-[28px] mb-8">
+                                <p className="text-xs font-bold text-slate-400 mb-1">ยอดรวมทั้งหมด</p>
+                                <p className="text-4xl font-bold">฿{formatMoney(totalSpent)}</p>
+                            </div>
+                            <div className="text-left space-y-3">
+                                <h3 className="text-sm font-bold border-l-4 border-[#EEBBC3] pl-3 mb-4">ต้องโอนให้กันดังนี้:</h3>
+                                {settlements.map((s, idx) => (
+                                    <div key={idx} className="flex justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                        <span className="font-bold text-sm">{s.from} ➜ {s.to}</span>
+                                        <span className="font-bold text-blue-500">฿{formatMoney(s.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-slate-300 mt-12 font-bold uppercase tracking-[4px]">Powered by Expense Pro</p>
+                        </div>
+                    </div>
                 </div>
             );
         }
