@@ -1,353 +1,237 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  LogOut, Plus, Users, Receipt, ChevronLeft, Trash2, Edit3, 
-  PieChart, ArrowRightLeft, UserCircle, Calculator, 
-  TrendingUp, Wallet, Bell, Settings, Share2, Sparkles
-} from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut 
-} from 'firebase/auth';
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Manager - Cloud</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel สำหรับรัน JSX บน Browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
-/**
- * Professional Design System:
- * - Ambient Gradients & Mesh Backgrounds
- * - Frosted Glass Containers (Glassmorphism)
- * - Dynamic Island-style Headers
- * - Liquid Transitions & Micro-interactions
- */
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Kanit:wght@300;400;600&display=swap');
+        body { font-family: 'Kanit', 'Inter', sans-serif; background-color: #F2F2F7; }
+        .glass { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.4); }
+        .dark-glass { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-// หมายเหตุ: อย่าลืมนำ URL จากการ Deploy GAS มาใส่ที่นี่
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyugjiLHeYvlNYAF_l1NGYqG-CWWLUTDf9NwLJF5PetU2WZYVN8BbkQlWS_VOwiT3LwmQ/exec"; 
+        // --- CONFIGURATION ---
+        // 1. ใส่ Config จาก Firebase Console ของคุณที่นี่
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+        
+        // 2. ใส่ URL จาก Google Apps Script ที่ Deploy แล้วที่นี่
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyddJ94rtznUODx16_OZsRtcBKYyayyjaCmNjpEWRs_qhsIQXtAcL6OTf8ykXZer1n6qA/exec"; 
 
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [view, setView] = useState('list');
-  const [groups, setGroups] = useState([]);
-  const [activeGroup, setActiveGroup] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  // UI State
-  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
 
-  // ตรวจสอบสถานะการเข้าสู่ระบบ
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u) fetchGroups(u.uid);
-      else setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('list');
+            const [groups, setGroups] = useState([]);
+            const [activeGroup, setActiveGroup] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+            const [newGroupName, setNewGroupName] = useState('');
 
-  // ดึงข้อมูลกลุ่มจาก Google Sheets
-  const fetchGroups = async (userId) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${GAS_WEB_APP_URL}?action=getGroups&userId=${userId}`);
-      const data = await response.json();
-      setGroups(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Fetch groups failed", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((u) => {
+                    setUser(u);
+                    if (u) fetchGroups(u.uid);
+                    else setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
 
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try { await signInWithPopup(auth, provider); } catch (err) { console.error(err); }
-  };
+            const fetchGroups = async (userId) => {
+                setLoading(true);
+                try {
+                    const response = await fetch(`${GAS_WEB_APP_URL}?action=getGroups&userId=${userId}`);
+                    const data = await response.json();
+                    setGroups(Array.isArray(data) ? data : []);
+                } catch (err) {
+                    console.error("Fetch failed", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
-  const handleLogout = () => signOut(auth);
+            const handleGoogleLogin = async () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try { await auth.signInWithPopup(provider); } catch (err) { console.error(err); }
+            };
 
-  const createGroup = async () => {
-    if (!newGroupName.trim() || !user) return;
-    setLoading(true);
-    try {
-      await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'createGroup',
-          userId: user.uid,
-          name: newGroupName.trim()
-        })
-      });
-      await fetchGroups(user.uid);
-      setShowAddGroupModal(false);
-      setNewGroupName('');
-    } catch (err) {
-      console.error("Create group failed", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+            const handleLogout = () => auth.signOut();
 
-  // --- UI Components ---
+            const createGroup = async () => {
+                if (!newGroupName.trim() || !user) return;
+                setLoading(true);
+                try {
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'createGroup',
+                            userId: user.uid,
+                            name: newGroupName.trim()
+                        })
+                    });
+                    await fetchGroups(user.uid);
+                    setShowAddGroupModal(false);
+                    setNewGroupName('');
+                } catch (err) {
+                    console.error("Create failed", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
-  const GlassCard = ({ children, onClick, className = "" }) => (
-    <div 
-      onClick={onClick}
-      className={`relative overflow-hidden bg-white/40 backdrop-blur-2xl border border-white/30 rounded-[2.5rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] transition-all duration-500 cursor-pointer group ${className}`}
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      {children}
-    </div>
-  );
-
-  if (loading && !user) {
-    return (
-      <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center p-6">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-600 rounded-full animate-spin"></div>
-          <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-blue-500 animate-pulse" />
-        </div>
-      </div>
-    );
-  }
-
-  // หน้าจอเข้าสู่ระบบ
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Ambient background decoration */}
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-400/20 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-400/20 blur-[120px] rounded-full" />
-
-        <div className="max-w-md w-full relative z-10">
-          <div className="bg-white/60 backdrop-blur-3xl rounded-[3rem] p-10 border border-white/40 shadow-2xl text-center">
-            <div className="w-24 h-24 bg-gradient-to-tr from-blue-600 to-indigo-400 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-200 animate-bounce-slow">
-              <Calculator className="w-12 h-12 text-white" />
-            </div>
-            <h1 className="text-4xl font-black tracking-tight text-slate-900 mb-4 bg-clip-text text-transparent bg-gradient-to-b from-slate-900 to-slate-600">
-              Expense <span className="text-blue-600">Manager</span>
-            </h1>
-            <p className="text-slate-500 mb-10 text-lg font-medium leading-relaxed">
-              จัดการทุกค่าใช้จ่ายในกลุ่มเพื่อน <br/>
-              ด้วยระบบคลาวด์อัจฉริยะผ่าน Google Sheets
-            </p>
-            <button 
-              onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-4 bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg hover:bg-black transition-all shadow-xl active:scale-95 group"
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 bg-white rounded-full p-1" alt="google" />
-              เข้าสู่ระบบด้วย Google
-            </button>
-            <p className="mt-8 text-xs text-slate-400 font-medium">Your data, secured by Google Cloud Analytics</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#F2F2F7] text-slate-900 font-sans selection:bg-blue-200 relative pb-20">
-      {/* Dynamic Header */}
-      <header className="sticky top-0 z-50 px-4 pt-6 pb-2">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white/70 backdrop-blur-2xl border border-white/40 rounded-[2rem] px-6 py-4 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-4">
-              {view === 'detail' && (
-                <button 
-                  onClick={() => setView('list')} 
-                  className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
-                >
-                  <ChevronLeft className="w-6 h-6 text-slate-700" />
-                </button>
-              )}
-              <div className="flex flex-col">
-                <h1 className="text-lg font-black tracking-tight leading-none">
-                  {view === 'list' ? 'Dashboard' : activeGroup?.name}
-                </h1>
-                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Cloud Smart Architecture</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end hidden sm:flex">
-                <span className="text-xs font-bold text-slate-800 leading-none">{user.displayName}</span>
-                <span className="text-[9px] text-slate-400 font-medium mt-0.5">Pro Membership</span>
-              </div>
-              <div className="relative group">
-                <div className="w-10 h-10 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group-hover:scale-105 transition-transform">
-                  {user.photoURL ? <img src={user.photoURL} alt="profile" /> : <UserCircle className="w-full h-full text-slate-300" />}
-                </div>
-                {/* Popover Logout */}
-                <button 
-                  onClick={handleLogout}
-                  className="absolute -bottom-1 -right-1 bg-red-500 text-white p-1 rounded-full border-2 border-white shadow-sm"
-                >
-                  <LogOut className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto p-4 space-y-8 mt-4">
-        {view === 'list' ? (
-          <>
-            {/* Quick Stats Widget */}
-            <section className="grid grid-cols-2 gap-4">
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-6 rounded-[2.5rem] text-white shadow-xl shadow-blue-200 flex flex-col justify-between aspect-square sm:aspect-auto sm:h-40">
-                <Wallet className="w-8 h-8 opacity-50" />
-                <div>
-                  <p className="text-xs font-bold opacity-80 uppercase tracking-wider mb-1">กลุ่มทั้งหมด</p>
-                  <h2 className="text-3xl font-black">{groups.length}</h2>
-                </div>
-              </div>
-              <div className="bg-white/60 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/40 shadow-sm flex flex-col justify-between aspect-square sm:aspect-auto sm:h-40">
-                <TrendingUp className="w-8 h-8 text-blue-600 opacity-50" />
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">สมาชิกทีม</p>
-                  <h2 className="text-3xl font-black text-slate-800">Premium</h2>
-                </div>
-              </div>
-            </section>
-
-            {/* Groups Grid */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between px-2">
-                <h2 className="text-xl font-black text-slate-900">รายการกลุ่มของคุณ</h2>
-                <div className="flex gap-2">
-                   <button className="p-2 bg-white/60 rounded-full border border-white/40"><Settings className="w-5 h-5 text-slate-400" /></button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {groups.map(group => (
-                  <GlassCard 
-                    key={group.id} 
-                    onClick={() => { setActiveGroup(group); setView('detail'); }}
-                    className="p-8"
-                  >
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center text-3xl shadow-inner border border-slate-50">
-                        {group.icon || '📊'}
-                      </div>
-                      <div className="bg-blue-500/10 text-blue-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
+            if (loading && !user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-600 rounded-full animate-spin"></div>
                     </div>
-                    <h3 className="text-2xl font-black text-slate-900 leading-tight mb-2">{group.name}</h3>
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Users className="w-4 h-4" />
-                      <span className="text-sm font-semibold">สร้างเมื่อ {new Date(group.createdAt).toLocaleDateString('th-TH')}</span>
+                );
+            }
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-400/20 blur-[120px] rounded-full"></div>
+                        <div className="max-w-md w-full relative z-10">
+                            <div className="glass rounded-[3rem] p-10 shadow-2xl text-center">
+                                <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
+                                    <i data-lucide="calculator" className="text-white w-10 h-10"></i>
+                                </div>
+                                <h1 className="text-3xl font-black text-slate-900 mb-2">Expense Manager</h1>
+                                <p className="text-slate-500 mb-10 font-medium">จัดการค่าใช้จ่ายกลุ่มเพื่อนบนระบบคลาวด์</p>
+                                <button 
+                                    onClick={handleGoogleLogin}
+                                    className="w-full flex items-center justify-center gap-4 bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-black transition-all shadow-xl active:scale-95"
+                                >
+                                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-1" alt="google" />
+                                    เข้าสู่ระบบด้วย Google
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                  </GlassCard>
-                ))}
-                
-                {/* Add New Group Card */}
-                <div 
-                  onClick={() => setShowAddGroupModal(true)}
-                  className="bg-dashed-border border-2 border-dashed border-slate-300 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer group"
-                >
-                  <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
-                    <Plus className="w-8 h-8" />
-                  </div>
-                  <span className="font-black text-lg">เพิ่มกลุ่มใหม่</span>
+                );
+            }
+
+            return (
+                <div className="min-h-screen text-slate-900 pb-24">
+                    <header className="sticky top-0 z-50 px-4 pt-6">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="glass rounded-3xl px-6 py-4 flex items-center justify-between shadow-sm">
+                                <h1 className="text-lg font-black">{view === 'list' ? 'Dashboard' : activeGroup?.name}</h1>
+                                <button onClick={handleLogout} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white shadow-md">
+                                    <img src={user.photoURL} alt="profile" />
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto p-4 space-y-6 mt-4">
+                        {view === 'list' ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {groups.map(group => (
+                                    <div 
+                                        key={group.id} 
+                                        onClick={() => { setActiveGroup(group); setView('detail'); }}
+                                        className="bg-white/50 border border-white p-8 rounded-[2.5rem] shadow-sm hover:shadow-md transition-all cursor-pointer"
+                                    >
+                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-3xl mb-4 shadow-inner">
+                                            {group.icon || '📊'}
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-900">{group.name}</h3>
+                                        <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">Active Group</p>
+                                    </div>
+                                ))}
+                                <div 
+                                    onClick={() => setShowAddGroupModal(true)}
+                                    className="border-2 border-dashed border-slate-300 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer"
+                                >
+                                    <i data-lucide="plus" className="w-8 h-8 mb-2"></i>
+                                    <span className="font-bold">เพิ่มกลุ่มใหม่</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-20">
+                                <i data-lucide="pie-chart" className="w-16 h-16 text-blue-500 mx-auto mb-4"></i>
+                                <h2 className="text-2xl font-black">{activeGroup?.name}</h2>
+                                <p className="text-slate-500 mt-2">กำลังดึงข้อมูลจาก Google Sheets...</p>
+                                <button onClick={() => setView('list')} className="mt-8 text-blue-600 font-bold">← กลับหน้าหลัก</button>
+                            </div>
+                        )}
+                    </main>
+
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50">
+                        <div className="dark-glass rounded-[2rem] px-8 py-4 flex items-center justify-between shadow-2xl">
+                            <i data-lucide="calculator" className="w-6 h-6 text-white cursor-pointer" onClick={() => setView('list')}></i>
+                            <div 
+                                onClick={() => setShowAddGroupModal(true)}
+                                className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg -mt-12 border-4 border-[#F2F2F7] cursor-pointer"
+                            >
+                                <i data-lucide="plus" className="w-6 h-6 text-white"></i>
+                            </div>
+                            <i data-lucide="settings" className="w-6 h-6 text-slate-500"></i>
+                        </div>
+                    </nav>
+
+                    {showAddGroupModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md">
+                            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 shadow-2xl border border-white">
+                                <h3 className="text-2xl font-black mb-6 text-center">ชื่อกลุ่มใหม่</h3>
+                                <input 
+                                    value={newGroupName}
+                                    onChange={(e) => setNewGroupName(e.target.value)}
+                                    placeholder="ทริปเที่ยว, ค่าบ้าน..."
+                                    className="w-full bg-slate-100 px-6 py-4 rounded-2xl outline-none focus:ring-2 ring-blue-500/30 font-bold mb-6 text-lg"
+                                />
+                                <button 
+                                    onClick={createGroup}
+                                    className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl active:scale-95"
+                                >
+                                    ยืนยันสร้างกลุ่ม
+                                </button>
+                                <button onClick={() => setShowAddGroupModal(false)} className="w-full mt-4 text-slate-400 font-bold">ยกเลิก</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
-              </div>
-            </section>
-          </>
-        ) : (
-          /* Detail View */
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="bg-white/60 backdrop-blur-3xl p-10 rounded-[3rem] border border-white/40 shadow-xl text-center relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-6 opacity-5">
-                <Receipt className="w-40 h-40" />
-              </div>
-              <PieChart className="w-20 h-20 text-blue-500 mx-auto mb-6 drop-shadow-2xl" />
-              <h2 className="text-3xl font-black text-slate-900 mb-2">{activeGroup?.name}</h2>
-              <p className="text-slate-500 font-medium leading-relaxed max-w-sm mx-auto">
-                ฟังก์ชันการจัดการบิลและคำนวณหนี้ กำลังอยู่ในขั้นตอนการจัดสรรข้อมูลจาก Google Sheets
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4 mt-10">
-                <button className="bg-slate-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all">
-                  <Plus className="w-5 h-5" /> เพิ่มบิล
-                </button>
-                <button className="bg-white text-slate-900 border border-slate-200 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all">
-                  <Share2 className="w-5 h-5" /> แชร์สรุป
-                </button>
-              </div>
-            </div>
+            );
+        }
 
-            <div className="px-4">
-               <button 
-                onClick={() => setView('list')} 
-                className="w-full py-4 text-slate-400 font-bold hover:text-slate-600 transition-colors"
-               >
-                ← กลับไปหน้า Dashboard
-               </button>
-            </div>
-          </div>
-        )}
-      </main>
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
 
-      {/* Navigation Bar (Bottom) */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50">
-        <div className="bg-black/80 backdrop-blur-2xl rounded-[2.5rem] px-8 py-4 flex items-center justify-between border border-white/10 shadow-2xl">
-          <button onClick={() => setView('list')} className={`p-2 rounded-2xl transition-all ${view === 'list' ? 'text-white bg-white/20' : 'text-slate-500 hover:text-white'}`}>
-            <Calculator className="w-6 h-6" />
-          </button>
-          <button className="p-2 text-slate-500 hover:text-white transition-all">
-            <Users className="w-6 h-6" />
-          </button>
-          <div 
-            onClick={() => setShowAddGroupModal(true)}
-            className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 -mt-12 border-4 border-[#F2F2F7] active:scale-90 transition-transform cursor-pointer"
-          >
-            <Plus className="w-6 h-6 text-white" />
-          </div>
-          <button className="p-2 text-slate-500 hover:text-white transition-all">
-            <TrendingUp className="w-6 h-6" />
-          </button>
-          <button className="p-2 text-slate-500 hover:text-white transition-all">
-            <Settings className="w-6 h-6" />
-          </button>
-        </div>
-      </nav>
-
-      {/* Add Group Modal */}
-      {showAddGroupModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white/90 backdrop-blur-3xl w-full max-w-sm rounded-[3rem] p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] border border-white animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-200 mx-auto">
-              <Plus className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-2xl font-black mb-2 text-center">เปิดตี้ใหม่</h3>
-            <p className="text-slate-500 text-sm mb-8 text-center font-medium">ระบุชื่อกลุ่มของคุณเพื่อเริ่มจัดการค่าเสียหาย</p>
-            
-            <div className="space-y-4">
-              <input 
-                autoFocus
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="เช่น ทริปเที่ยวทะเล"
-                className="w-full bg-slate-100/50 border-none px-6 py-5 rounded-2xl outline-none focus:ring-2 ring-blue-500/30 font-bold text-lg text-slate-900 placeholder:text-slate-400"
-              />
-              <button 
-                onClick={createGroup}
-                disabled={!newGroupName.trim() || loading}
-                className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-blue-200 active:scale-95 disabled:opacity-50 transition-all"
-              >
-                {loading ? 'กำลังสร้าง...' : 'ลุยเลย!'}
-              </button>
-              <button 
-                onClick={() => setShowAddGroupModal(false)} 
-                className="w-full py-2 font-bold text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                ยกเลิก
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        // Initialize Lucide Icons after render
+        setTimeout(() => lucide.createIcons(), 500);
+    </script>
+</body>
+</html>
