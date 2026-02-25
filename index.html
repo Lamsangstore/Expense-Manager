@@ -74,6 +74,14 @@
         }
         .btn-secondary:active { transform: translateY(3px); border-bottom-width: 2px; }
 
+        /* คลาสหน้าตารูปดอกไม้ (Flower Shape) ด้วย mask-image */
+        .shape-flower {
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z'/%3E%3C/svg%3E");
+            -webkit-mask-size: 100% 100%;
+            mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 0 A 15 15 0 0 1 65 15 A 15 15 0 0 1 85 15 A 15 15 0 0 1 85 35 A 15 15 0 0 1 100 50 A 15 15 0 0 1 85 65 A 15 15 0 0 1 85 85 A 15 15 0 0 1 65 85 A 15 15 0 0 1 50 100 A 15 15 0 0 1 35 85 A 15 15 0 0 1 15 85 A 15 15 0 0 1 15 65 A 15 15 0 0 1 0 50 A 15 15 0 0 1 15 35 A 15 15 0 0 1 15 15 A 15 15 0 0 1 35 15 A 15 15 0 0 1 50 0 Z'/%3E%3C/svg%3E");
+            mask-size: 100% 100%;
+        }
+
         .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
@@ -444,30 +452,34 @@
             // Calculations
             const totalSpent = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
             
-            // สรุปค่าใช้จ่ายที่แต่ละคนต้องจ่ายทั้งหมด (ยอดที่ต้องรับผิดชอบในทริป)
+            // สรุปค่าใช้จ่ายที่แต่ละคนต้องจ่ายทั้งหมด (แบบละเอียด)
             const individualShares = useMemo(() => {
                 if (!activeGroup || !activeGroup.members) return [];
-                const shares = {};
-                activeGroup.members.forEach(m => shares[m] = 0);
+                const stats = {};
+                activeGroup.members.forEach(m => stats[m] = { paid: 0, share: 0, balance: 0 });
                 
                 expenses.forEach(e => {
+                    // ออกเงินไปแล้ว
+                    if (stats[e.payer]) stats[e.payer].paid += e.amount;
+                    
+                    // ส่วนที่ต้องรับผิดชอบ
                     const parts = e.participants || [];
                     if (parts.length > 0) {
                         const sharePerPerson = e.amount / parts.length;
                         parts.forEach(p => {
-                            if (shares[p] !== undefined) {
-                                shares[p] += sharePerPerson;
-                            }
+                            if (stats[p]) stats[p].share += sharePerPerson;
                         });
                     }
                 });
                 
-                return Object.keys(shares)
-                    .map(name => ({ name, amount: shares[name] }))
-                    .sort((a, b) => b.amount - a.amount);
+                return Object.keys(stats).map(name => {
+                    const s = stats[name];
+                    s.balance = s.paid - s.share; // + ได้คืน, - ต้องจ่ายเพิ่ม
+                    return { name, ...s };
+                }).sort((a, b) => b.balance - a.balance);
             }, [activeGroup, expenses]);
 
-            // สรุปการเคลียร์เงิน (Settlement)
+            // สรุปการเคลียร์เงิน (ใครโอนให้ใคร)
             const settlements = useMemo(() => {
                 if (!activeGroup || activeGroup.members.length < 2) return [];
                 const balances = {};
@@ -500,8 +512,13 @@
                     ...expenses.map(e => [e.description, e.amount, e.payer, e.participants.join(', ')]),
                     [], ["จาก", "ถึง", "จำนวนที่ต้องโอน"],
                     ...settlements.map(s => [s.from, s.to, s.amount]),
-                    [], ["ชื่อสมาชิก", "ยอดรวมที่ต้องรับผิดชอบ"],
-                    ...individualShares.map(i => [i.name, i.amount])
+                    [], ["ชื่อสมาชิก", "ออกไปแล้ว (Paid)", "ยอดที่ต้องรับผิดชอบ (Share)", "สรุป (ได้คืน/จ่ายเพิ่ม)"],
+                    ...individualShares.map(i => [
+                        i.name, 
+                        i.paid, 
+                        i.share, 
+                        i.balance > 0 ? `ได้คืน ${i.balance.toFixed(2)}` : i.balance < 0 ? `จ่ายเพิ่ม ${Math.abs(i.balance).toFixed(2)}` : "พอดี"
+                    ])
                 ];
                 const ws = XLSX.utils.aoa_to_sheet(data);
                 const wb = XLSX.utils.book_new();
@@ -522,12 +539,18 @@
                 );
             };
 
-            const Avatar = ({ name, size = "sm" }) => (
-                <div style={{ backgroundColor: getMemberColor(name) }} 
-                     className={`${size === "sm" ? "w-8 h-8 text-[11px]" : "w-12 h-12 text-sm"} rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm text-[#2B3A4A] shrink-0`}>
-                    {name[0].toUpperCase()}
-                </div>
-            );
+            // ปรับ Avatar ให้เป็นรูปทรงดอกไม้ (Flower/Squircle) พร้อมตัวหนังสือใหญ่มาก
+            const Avatar = ({ name, size = "sm" }) => {
+                let szClass = size === "sm" ? "w-9 h-9 text-[22px]" : "w-12 h-12 text-[30px]";
+                return (
+                    <div className="shrink-0 flex items-center justify-center filter drop-shadow-sm">
+                        <div style={{ backgroundColor: getMemberColor(name) }} 
+                             className={`${szClass} shape-flower flex items-center justify-center font-black text-[#2B3A4A]`}>
+                            <span className="leading-none mt-1">{name[0].toUpperCase()}</span>
+                        </div>
+                    </div>
+                );
+            };
 
             if (loading) return <div className="h-screen flex items-center justify-center"><div className="loader"></div></div>;
 
@@ -614,13 +637,13 @@
                                                     <div className="flex flex-col gap-1.5 items-start">
                                                         <span className="text-[11px] text-slate-500 font-bold uppercase tracking-widest bg-white/60 px-2.5 py-1 rounded-md shadow-sm border border-white">{(g.members || []).length} สมาชิก</span>
                                                         {/* แสดงวันที่สร้างกลุ่ม */}
-                                                        <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1.5"><i data-lucide="calendar" className="w-3 h-3"></i> {formatDate(g.createdAt)}</span>
+                                                        <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1.5 mt-1"><i data-lucide="calendar" className="w-3 h-3"></i> สร้าง: {formatDate(g.createdAt)}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="mt-5 flex -space-x-2 pl-2">
                                                 {(g.members || []).slice(0, 6).map((m, idx) => <Avatar key={idx} name={m} />)}
-                                                {(g.members || []).length > 6 && <div className="w-8 h-8 rounded-full bg-white border-2 border-[#FFD1DC] flex items-center justify-center text-[9px] font-bold shadow-sm">+{g.members.length - 6}</div>}
+                                                {(g.members || []).length > 6 && <div className="w-9 h-9 rounded-full bg-white border-2 border-[#FFD1DC] flex items-center justify-center text-[10px] font-bold shadow-sm z-10 relative">+{(g.members || []).length - 6}</div>}
                                             </div>
                                         </div>
                                     ))}
@@ -663,7 +686,7 @@
                                     </div>
                                 </div>
 
-                                {/* Expenses List */}
+                                {/* Expenses List (อยู่ข้างบน และปุ่มใหญ่) */}
                                 <div className="space-y-4">
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4 px-1 mb-2">
                                         <h3 className="font-bold text-xl text-[#2B3A4A] ml-2 w-full sm:w-auto text-left">🧾 บิลทั้งหมด</h3>
@@ -681,7 +704,7 @@
                                                         <h4 className="font-bold text-base leading-tight mb-1.5">{e.description}</h4>
                                                         {/* แสดงรายชื่อคนหารบิลทั้งหมด */}
                                                         <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
-                                                            จ่ายโดย <span className="text-[#2B3A4A] bg-white/50 px-1.5 py-0.5 rounded">{e.payer}</span><br/>
+                                                            จ่ายโดย <span className="text-[#2B3A4A] bg-white/50 px-1.5 py-0.5 rounded shadow-sm">{e.payer}</span><br/>
                                                             <span className="text-slate-400 font-normal">หาร: {(e.participants || []).join(', ')}</span>
                                                         </p>
                                                     </div>
@@ -720,7 +743,7 @@
                                     </div>
                                 </div>
 
-                                {/* Settlement (สรุปการเคลียร์เงิน) */}
+                                {/* Settlement (สรุปการเคลียร์เงิน นำมาไว้ล่าง) */}
                                 <div className="glass-card p-7 bg-white/50 mt-8">
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
                                         <h3 className="font-bold flex items-center gap-2 text-lg text-[#2B3A4A]"><span className="text-2xl">💸</span> สรุปการเคลียร์เงิน (ใครโอนให้ใคร)</h3>
@@ -755,27 +778,45 @@
                                     </div>
                                 </div>
 
-                                {/* สรุปยอดค่าใช้จ่ายที่แต่ละคนต้องรับผิดชอบ (เพิ่มใหม่) */}
-                                <div className="glass-card p-7 bg-white/60 mb-8">
+                                {/* NEW: สรุปยอดค่าใช้จ่ายที่แต่ละคนต้องจ่ายทั้งหมด (แบบละเอียด) */}
+                                <div className="glass-card p-7 bg-white/70 mb-8">
                                     <div className="flex items-center justify-between mb-6">
-                                        <h3 className="font-bold flex items-center gap-2 text-lg text-[#2B3A4A]"><span className="text-2xl">📊</span> สรุปค่าใช้จ่ายแต่ละคน</h3>
+                                        <h3 className="font-bold flex items-center gap-2 text-xl text-[#2B3A4A]"><span className="text-3xl">📊</span> สรุปค่าใช้จ่ายแต่ละคน</h3>
                                     </div>
-                                    <div className="space-y-3">
+                                    <div className="space-y-5">
                                         {individualShares.map((item, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-white/80 rounded-[20px] border border-white shadow-sm animate-pop" style={{animationDelay: `${idx*0.05}s`}}>
-                                                <div className="flex items-center gap-4">
-                                                    <Avatar name={item.name} size="md" />
-                                                    <span className="font-bold text-[15px] text-[#2B3A4A]">{item.name}</span>
+                                            <div key={idx} className="p-6 bg-white/90 rounded-[24px] border border-white shadow-sm animate-pop flex flex-col gap-4" style={{animationDelay: `${idx*0.05}s`}}>
+                                                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <Avatar name={item.name} size="md" />
+                                                        <span className="font-bold text-[17px] text-[#2B3A4A]">{item.name}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        {item.balance > 0.01 ? (
+                                                            <span className="text-emerald-600 font-bold bg-emerald-50 px-3.5 py-1.5 rounded-xl text-xs border border-emerald-100 shadow-sm">ได้คืน ฿{formatMoney(item.balance)}</span>
+                                                        ) : item.balance < -0.01 ? (
+                                                            <span className="text-red-500 font-bold bg-red-50 px-3.5 py-1.5 rounded-xl text-xs border border-red-100 shadow-sm">จ่ายเพิ่ม ฿{formatMoney(Math.abs(item.balance))}</span>
+                                                        ) : (
+                                                            <span className="text-slate-400 font-bold bg-slate-50 px-3.5 py-1.5 rounded-xl text-xs border border-slate-100 shadow-sm">พอดีแล้ว</span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">ยอดรวมที่รับผิดชอบ</p>
-                                                    <p className="text-xl font-black text-[#FF9EAE]">฿{formatMoney(item.amount)}</p>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide mb-1">ออกไปแล้ว</p>
+                                                        <p className="text-xl font-black text-[#89CFF0]">฿{formatMoney(item.paid)}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide mb-1">ยอดที่ต้องรับผิดชอบ</p>
+                                                        <p className="text-xl font-black text-[#FF9EAE]">฿{formatMoney(item.share)}</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
                                         {individualShares.length === 0 && <div className="py-8 text-center opacity-40 font-bold text-lg">ยังไม่มีค่าใช้จ่ายเกิดขึ้น ✨</div>}
                                     </div>
                                 </div>
+
                             </div>
                         )}
                     </main>
