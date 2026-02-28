@@ -17,7 +17,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase SDKs (Compat Version for ease of use in single script) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
@@ -108,7 +108,7 @@
         const { useState, useEffect, useMemo, useRef } = React;
         const ReactDOMClient = window.ReactDOM;
 
-        // Firebase Configuration (Using provided or default fallback)
+        // Firebase Configuration
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : {
@@ -125,6 +125,15 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+
+        const handlePermissionError = (e, contextMessage) => {
+            console.error(`${contextMessage} Error:`, e);
+            if (e.message && (e.message.includes('permission') || e.message.includes('insufficient'))) {
+                alert(`⚠️ ${contextMessage} (Permission Denied)\nกรุณาตรวจสอบกฎของ Firestore ใน Firebase Console`);
+            } else {
+                alert(`${contextMessage}: ${e.message}`);
+            }
+        };
 
         const LucideIcon = ({ name, className = "" }) => {
             const iconRef = useRef(null);
@@ -169,68 +178,56 @@
             const [expParticipants, setExpParticipants] = useState([]);
             const [dashError, setDashError] = useState('');
 
-            // --- 1. การตั้งค่าการจดจำการเข้าสู่ระบบ (Persistence) และ Auth Logic ---
+            // 1. Auth Init with Persistence (ทำให้จดจำการล็อกอิน)
             useEffect(() => {
                 let isMounted = true;
-
-                const setupAuth = async () => {
+                const initAuth = async () => {
                     try {
-                        // บังคับให้จดจำ Session ในเครื่อง (Local)
+                        // บังคับใช้โหมดจดจำ Session ในเครื่อง
                         await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
                         
-                        // ตรวจสอบการกู้คืน Session หรือเตรียม Anonymous Auth
-                        auth.onAuthStateChanged(async (u) => {
+                        const unsubscribe = auth.onAuthStateChanged(async (u) => {
                             if (!isMounted) return;
-                            
                             if (u) {
-                                // มี User เดิม หรือ Login สำเร็จ
                                 setUser(u);
                                 setLoading(false);
                             } else {
-                                // ไม่มี User และไม่ได้ติดค้างหน้า Dashboard ให้ลอง Login Anonymous เพื่อเป็น Default State
+                                // ถ้าไม่มี Session เดิม และไม่ใช่การแชร์ลิงก์ Dashboard ให้ Login Anonymous ไว้เป็น Default
                                 if (!dashIdFromUrl) {
                                     try {
-                                        const anonUser = await auth.signInAnonymously();
-                                        setUser(anonUser.user);
-                                    } catch (e) {
-                                        console.error("Anonymous Sign-in failed", e);
-                                    }
+                                        const anon = await auth.signInAnonymously();
+                                        setUser(anon.user);
+                                    } catch (e) { console.error(e); }
                                 }
                                 setLoading(false);
                             }
                         });
+                        return unsubscribe;
                     } catch (err) {
                         console.error("Auth Setup Error:", err);
                         if (isMounted) setLoading(false);
                     }
                 };
-
-                setupAuth();
+                initAuth();
                 return () => { isMounted = false; };
             }, []);
 
-            // 2. Load Dashboard (ถ้าเข้าผ่าน Link)
+            // 2. Load Dashboard (จากลิงก์แชร์)
             useEffect(() => {
                 if (!user || !dashIdFromUrl) return;
-
                 const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(dashIdFromUrl);
                 const unsubscribe = groupRef.onSnapshot(doc => {
                     if (doc.exists) {
                         setActiveGroup({ id: doc.id, ...doc.data() });
                         setView('dashboard');
-                        setDashError('');
                     } else {
-                        setDashError("ลิงก์แดชบอร์ดไม่ถูกต้อง หรือกลุ่มนี้ถูกลบไปแล้วครับ");
+                        setDashError("ลิงก์ไม่ถูกต้อง หรือกลุ่มถูกลบแล้วครับ");
                     }
-                }, (err) => {
-                    console.error("Dashboard Fetch Error:", err);
-                    setDashError("เกิดข้อผิดพลาดในการโหลดข้อมูลทริป หรือคุณไม่มีสิทธิ์เข้าถึงครับ");
                 });
-
                 return () => unsubscribe();
             }, [user, dashIdFromUrl]);
 
-            // 3. Auto-Join Logic
+            // 3. ระบบ Auto-Join เมื่อเข้าผ่านลิงก์ ?join=xxx
             useEffect(() => {
                 const inviteId = urlParams.get('join');
                 if (!user || user.isAnonymous || !inviteId) return;
@@ -240,26 +237,24 @@
                         const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                         const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(inviteId);
                         const doc = await groupRef.get();
-
                         if (doc.exists) {
                             const data = doc.data();
                             if (!(data.members || []).includes(myName)) {
                                 await groupRef.update({ members: firebase.firestore.FieldValue.arrayUnion(myName) });
-                                alert(`ยินดีต้อนรับ! เข้าร่วมกลุ่ม "${data.name}" เรียบร้อย 🎉`);
+                                alert(`เข้าร่วมกลุ่ม "${data.name}" สำเร็จ! 🎉`);
                             }
                             setActiveGroup({ id: doc.id, ...data });
                             setView('detail');
                         }
-                    } catch (e) { console.error("Auto-join error:", e); }
+                    } catch (e) { console.error("Join error:", e); }
                     window.history.replaceState({}, document.title, window.location.pathname);
                 };
                 processJoin();
             }, [user]);
 
-            // 4. Load Groups List
+            // 4. โหลดรายชื่อกลุ่ม (List)
             useEffect(() => {
                 if (!user || user.isAnonymous || dashIdFromUrl) return;
-
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                 const groupsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
 
@@ -268,7 +263,6 @@
                     const myGroups = data
                         .filter(g => g.ownerId === user.uid || (g.members && g.members.includes(myName)))
                         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
                     setGroups(myGroups);
                     if (activeGroup && view === 'detail') {
                         const updated = myGroups.find(g => g.id === activeGroup.id);
@@ -278,11 +272,10 @@
                 return () => unsubscribe();
             }, [user, activeGroup?.id, view]);
 
-            // 5. Load Expenses
+            // 5. โหลดค่าใช้จ่าย (Expenses)
             useEffect(() => {
                 if (!user || !activeGroup) return;
                 const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
-
                 const unsubscribe = expRef.onSnapshot((snap) => {
                     const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setExpenses(list.sort((a, b) => b.date - a.date));
@@ -290,24 +283,7 @@
                 return () => unsubscribe();
             }, [user, activeGroup?.id]);
 
-            // Helper Functions
-            const handleLogin = async () => {
-                try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    // Firebase จะจำ User นี้ไว้ใน Local Storage โดยอัตโนมัติจากการตั้ง Persistence
-                    await auth.signInWithPopup(provider);
-                } catch (e) {
-                    console.error("Login Failed:", e);
-                }
-            };
-
-            const handleLogout = async () => {
-                if (confirm("ต้องการออกจากระบบใช่หรือไม่?")) {
-                    await auth.signOut();
-                    window.location.reload(); // เคลียร์ State ทั้งหมด
-                }
-            };
-
+            // UI Helpers
             const getGroupStyle = (id = "default") => {
                 let hash = 0;
                 for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
@@ -324,7 +300,7 @@
             };
 
             const formatMoney = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const formatDate = (t) => t ? new Date(t).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+            const formatDate = (ts) => ts ? new Date(ts).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 
             const evaluateMath = (str) => {
                 try {
@@ -333,7 +309,14 @@
                 } catch (e) { return 0; }
             };
 
-            // Actions
+            // Handlers
+            const handleLogin = async () => {
+                try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    await auth.signInWithPopup(provider);
+                } catch (e) { console.error("Login Failed:", e); }
+            };
+
             const createGroup = async () => {
                 if (!newGroupName.trim() || !user || user.isAnonymous) return;
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
@@ -347,45 +330,72 @@
                     });
                     setNewGroupName('');
                     setShowAddGroup(false);
-                } catch (e) { alert("สร้างกลุ่มไม่สำเร็จ ลองตรวจสอบอินเทอร์เน็ตครับ"); }
+                } catch (e) { handlePermissionError(e, "สร้างกลุ่มไม่สำเร็จ"); }
+            };
+
+            const updateGroupName = async () => {
+                if (!editGroupName.trim() || !activeGroup) return;
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ name: editGroupName.trim() });
+                setShowEditGroup(false);
+            };
+
+            const deleteGroup = async (id, e) => {
+                e.stopPropagation();
+                if (confirm("ลบทริปนี้ถาวร?")) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete();
+                }
             };
 
             const joinGroup = async () => {
                 if (!joinId.trim() || !user || user.isAnonymous) return;
-                try {
-                    const myName = user.displayName?.split(' ')[0] || 'ฉัน';
-                    const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim());
-                    const doc = await groupRef.get();
-                    if (!doc.exists) return alert("ไม่พบกลุ่มนี้ครับ");
+                const myName = user.displayName?.split(' ')[0] || 'ฉัน';
+                const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim());
+                const doc = await groupRef.get();
+                if (!doc.exists) return alert("ไม่พบกลุ่มครับ");
+                if (!(doc.data().members || []).includes(myName)) {
+                    await groupRef.update({ members: firebase.firestore.FieldValue.arrayUnion(myName) });
+                }
+                setShowJoinGroup(false);
+                setJoinId('');
+                setActiveGroup({ id: doc.id, ...doc.data() });
+                setView('detail');
+            };
 
-                    if (!(doc.data().members || []).includes(myName)) {
-                        await groupRef.update({ members: firebase.firestore.FieldValue.arrayUnion(myName) });
-                    }
-                    setJoinId('');
-                    setShowJoinGroup(false);
-                    setActiveGroup({ id: doc.id, ...doc.data() });
-                    setView('detail');
-                } catch (e) { alert("เข้าร่วมไม่สำเร็จครับ"); }
+            const addMember = async () => {
+                if (!newMemberName.trim() || !activeGroup) return;
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
+                    members: firebase.firestore.FieldValue.arrayUnion(newMemberName.trim())
+                });
+                setNewMemberName('');
+            };
+
+            const removeMember = async (name) => {
+                if (confirm(`ลบ ${name}?`)) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
+                        members: firebase.firestore.FieldValue.arrayRemove(name)
+                    });
+                }
             };
 
             const saveExpense = async () => {
-                if (!user || user.isAnonymous || !activeGroup) return;
+                if (!activeGroup) return;
                 const amount = evaluateMath(expAmount);
                 if (!expDesc || amount <= 0 || !expPayer) return;
-
-                const data = {
-                    description: expDesc, amount, payer: expPayer, participants: expParticipants,
-                    date: editingExpense ? editingExpense.date : Date.now()
-                };
-
+                const data = { description: expDesc, amount, payer: expPayer, participants: expParticipants, date: editingExpense ? editingExpense.date : Date.now() };
                 const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
                 if (editingExpense) await ref.doc(editingExpense.id).update(data);
                 else await ref.add(data);
-
                 setShowExpenseModal(false);
                 setEditingExpense(null);
             };
 
+            const deleteExpense = async (id) => {
+                if (confirm("ลบบิลนี้?")) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
+                }
+            };
+
+            // Calculations
             const totalSpent = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
 
             const individualShares = useMemo(() => {
@@ -432,10 +442,44 @@
                 return res;
             }, [activeGroup, expenses]);
 
+            // Export Functions
+            const shareLink = () => {
+                const url = `${window.location.origin}${window.location.pathname}?join=${activeGroup.id}`;
+                navigator.clipboard.writeText(url);
+                alert("คัดลอกลิงก์เชิญเพื่อนแล้ว! 🔗");
+            };
+
             const copyDashboardLink = () => {
                 const url = `${window.location.origin}${window.location.pathname}?dashboard=${activeGroup.id}`;
                 navigator.clipboard.writeText(url);
-                alert("คัดลอกลิงก์ Dashboard แล้ว! ส่งให้ใครดูก็ได้ทันที 📊✨");
+                alert("คัดลอกลิงก์ Dashboard สรุปยอดแล้ว! 📊");
+            };
+
+            const exportImage = async () => {
+                setExporting(true);
+                const el = document.getElementById('export-area');
+                el.style.position = "fixed"; el.style.left = "0"; el.style.top = "0"; el.style.zIndex = "-9999";
+                const canvas = await html2canvas(el, { scale: 2, useCORS: true, width: 1200, height: el.scrollHeight });
+                const link = document.createElement('a');
+                link.download = `Summary_${activeGroup.name}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                el.style.position = "absolute"; el.style.left = "-9999px";
+                setExporting(false);
+            };
+
+            const exportExcel = () => {
+                const data = [
+                    ["ทริป:", activeGroup.name], ["ยอดรวม:", totalSpent], [],
+                    ["รายการ", "จำนวนเงิน", "ผู้จ่าย", "คนหาร"],
+                    ...expenses.map(e => [e.description, e.amount, e.payer, e.participants.join(', ')]),
+                    [], ["ใครโอน", "ไปที่ใคร", "จำนวน"],
+                    ...settlements.map(s => [s.from, s.to, s.amount])
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "สรุปบิล");
+                XLSX.writeFile(wb, `Expenses_${activeGroup.name}.xlsx`);
             };
 
             // Components
@@ -446,27 +490,27 @@
             };
 
             const Avatar = ({ name, size = "sm" }) => {
-                let sz = size === "sm" ? "w-9 h-9 text-lg" : "w-12 h-12 text-2xl";
+                let sz = size === "sm" ? "w-9 h-9 text-lg" : size === "lg" ? "w-[60px] h-[60px] text-[32px]" : "w-12 h-12 text-2xl";
                 return (
-                    <div style={{ backgroundColor: getMemberColor(name) }} className={`${sz} shape-flower flex items-center justify-center font-black text-white drop-shadow-sm`}>
-                        <span className="mt-1">{name ? name[0].toUpperCase() : ''}</span>
+                    <div style={{ backgroundColor: getMemberColor(name) }} className={`${sz} shape-flower flex items-center justify-center font-black text-white drop-shadow-sm shrink-0`}>
+                        <span className="mt-1 leading-none">{name ? name[0].toUpperCase() : ''}</span>
                     </div>
                 );
             };
 
             if (loading) return <div className="h-screen flex items-center justify-center"><div className="loader"></div></div>;
 
-            // บังคับ Login ถ้าไม่ใช่หน้า Dashboard และไม่มี User จริง
+            // บังคับล็อกอินถ้าไม่ใช่หน้า Dashboard
             if (!user || (user.isAnonymous && !dashIdFromUrl && view !== 'dashboard')) {
                 return (
                     <div className="h-screen flex items-center justify-center p-6 animate-pop">
                         <div className="glass-card p-10 text-center max-w-sm w-full shadow-2xl">
                             <div className="w-24 h-24 bg-white/80 rounded-[28px] flex items-center justify-center mx-auto mb-6 shadow-md border-2 border-white text-5xl">🧸</div>
-                            <h1 className="text-3xl font-bold mb-2 text-[#2B3A4A]">Expense Pro</h1>
-                            <p className="text-sm text-slate-500 mb-8 font-medium">เข้าสู่ระบบเพื่อจดจำทริปของคุณถาวร ✨</p>
+                            <h1 className="text-3xl font-bold mb-2">Expense Pro</h1>
+                            <p className="text-sm text-slate-500 mb-8">จัดการทริปและจดบิลกลุ่มง่ายๆ ✨</p>
                             <button onClick={handleLogin} className="btn-primary w-full py-4 px-6 flex items-center justify-center gap-3 font-bold shadow-lg">
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 bg-white rounded-full p-1" />
-                                ล็อกอินด้วย Google
+                                เข้าสู่ระบบด้วย Google
                             </button>
                         </div>
                     </div>
@@ -481,14 +525,13 @@
                                 {view !== 'list' && (
                                     <button onClick={() => { setView('list'); window.history.replaceState({}, '', window.location.pathname); }} className="p-2 hover:bg-white/50 rounded-xl"><LucideIcon name="arrow-left" className="w-6 h-6" /></button>
                                 )}
-                                <h2 className="text-xl font-bold truncate max-w-[150px]">{view === 'list' ? 'ทริปของฉัน' : activeGroup?.name}</h2>
+                                <h2 className="text-xl font-bold truncate max-w-[200px]">{view === 'list' ? 'ทริปของฉัน' : view === 'dashboard' ? 'สรุปยอดทริป' : activeGroup?.name}</h2>
                             </div>
                             <div className="flex items-center gap-3">
-                                <p className="text-xs font-bold text-[#2B3A4A] hidden sm:block">{user.displayName?.split(' ')[0]}</p>
-                                <div className="relative group cursor-pointer" onClick={handleLogout}>
-                                    <img src={user.photoURL || 'https://via.placeholder.com/150'} className="w-10 h-10 rounded-2xl border-2 border-white shadow-md object-cover" />
-                                    <div className="absolute -top-1 -right-1 bg-red-400 w-3 h-3 rounded-full border-2 border-white group-hover:scale-125 transition-transform"></div>
+                                <div className="hidden sm:block text-right">
+                                    <p className="text-[10px] text-slate-500 font-bold">{user.displayName?.split(' ')[0]}</p>
                                 </div>
+                                <img src={user.photoURL || 'https://via.placeholder.com/150'} className="w-10 h-10 rounded-2xl border-2 border-white shadow-md cursor-pointer" onClick={() => auth.signOut().then(() => window.location.reload())} />
                             </div>
                         </div>
                     </header>
@@ -497,63 +540,91 @@
                         {view === 'list' && (
                             <div className="space-y-6">
                                 <div className="flex gap-4">
-                                    <button onClick={() => setShowAddGroup(true)} className="btn-primary flex-1 py-8 shadow-md flex flex-col items-center justify-center gap-2 font-bold">
+                                    <button onClick={() => setShowAddGroup(true)} className="btn-primary flex-1 py-8 shadow-md flex flex-col items-center justify-center gap-3 text-lg font-bold">
                                         <LucideIcon name="plus-circle" className="w-7 h-7" /> สร้างทริปใหม่
                                     </button>
-                                    <button onClick={() => setShowJoinGroup(true)} className="btn-secondary flex-1 py-8 shadow-md flex flex-col items-center justify-center gap-2 font-bold">
+                                    <button onClick={() => setShowJoinGroup(true)} className="btn-secondary flex-1 py-8 shadow-md flex flex-col items-center justify-center gap-3 text-lg font-bold">
                                         <LucideIcon name="users" className="w-7 h-7" /> เข้าทริปเพื่อน
                                     </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                     {groups.map(g => (
-                                        <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-5 cursor-pointer hover:shadow-xl transition-all bg-white/40 flex items-center gap-4">
-                                            <GroupIcon id={g.id} />
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-lg truncate">{g.name}</h3>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{(g.members || []).length} สมาชิก</p>
+                                        <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-5 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all bg-white/40 flex flex-col justify-between min-h-[160px] group">
+                                            <div className="flex items-center gap-5">
+                                                <GroupIcon id={g.id} size="xl" />
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-xl truncate mb-1">{g.name}</h3>
+                                                    <span className="text-[11px] text-slate-500 font-bold uppercase tracking-widest bg-white/60 px-2 py-1 rounded-md">{(g.members || []).length} สมาชิก</span>
+                                                </div>
                                             </div>
-                                            <LucideIcon name="chevron-right" className="text-slate-300 w-5 h-5" />
+                                            <div className="mt-4 flex justify-between items-end">
+                                                <div className="flex -space-x-2">
+                                                    {(g.members || []).slice(0, 5).map((m, idx) => <Avatar key={idx} name={m} size="sm" />)}
+                                                </div>
+                                                <button onClick={(e) => deleteGroup(g.id, e)} className="p-2 text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><LucideIcon name="trash-2" className="w-5 h-5" /></button>
+                                            </div>
                                         </div>
                                     ))}
-                                    {groups.length === 0 && <p className="col-span-full py-20 text-center opacity-40 font-bold">เริ่มสร้างทริปแรกของคุณเลย! 🏕️</p>}
+                                    {groups.length === 0 && <div className="col-span-full py-24 text-center glass-card border-dashed border-2 border-[#FFB6C1] opacity-50">คุณยังไม่มีทริป เริ่มเลย! 🏕️</div>}
                                 </div>
                             </div>
                         )}
 
                         {view === 'detail' && activeGroup && (
                             <div className="space-y-6">
-                                <div className="glass-card p-8 text-center relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-4">
-                                        <button onClick={copyDashboardLink} className="p-2 bg-white/50 rounded-xl hover:bg-white transition-all"><LucideIcon name="share-2" className="w-5 h-5 text-slate-500" /></button>
+                                {/* Hero Card */}
+                                <div className="glass-card p-8 relative overflow-hidden bg-gradient-to-br from-white/70 to-white/40 shadow-xl border-white/80">
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                                        <span className="text-[250px] leading-none transform rotate-12 scale-[1.2] blur-xl">{getGroupStyle(activeGroup.id).emoji}</span>
                                     </div>
-                                    <div className="text-6xl mb-4">{getGroupStyle(activeGroup.id).emoji}</div>
-                                    <h1 className="text-4xl font-black mb-2">{activeGroup.name}</h1>
-                                    <div className="bg-white/80 p-6 rounded-3xl border-2 border-white shadow-sm inline-block min-w-[200px] mt-4">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">ยอดรวมทั้งหมด</p>
-                                        <p className="text-4xl font-black text-[#FF9EAE]">฿{formatMoney(totalSpent)}</p>
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest bg-white/60 px-3 py-1 rounded-full shadow-sm">ยอดรวมใช้จ่ายทริป</p>
+                                            <div className="flex gap-2">
+                                                <span className="text-[10px] font-bold bg-white/80 px-2 py-1 rounded-lg">ID: {activeGroup.id}</span>
+                                                <button onClick={shareLink} className="bg-white p-2 rounded-lg shadow-sm hover:text-blue-500"><LucideIcon name="user-plus" className="w-4 h-4" /></button>
+                                            </div>
+                                        </div>
+                                        <h1 className="text-5xl font-black mb-6 text-[#2B3A4A]">฿{formatMoney(totalSpent)}</h1>
+                                        <div className="flex flex-wrap gap-2">
+                                            {(activeGroup.members || []).map(m => (
+                                                <div key={m} className="bg-white/80 px-3 py-1.5 rounded-xl border border-white flex items-center gap-2 text-xs font-bold">
+                                                    <div style={{backgroundColor: getMemberColor(m)}} className="w-2.5 h-2.5 rounded-full border border-white"></div>
+                                                    {m}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* รายการบิล */}
                                 <div className="space-y-4">
-                                    <div className="flex justify-between items-center px-1">
-                                        <h3 className="font-bold text-xl">🧾 บิลทั้งหมด</h3>
-                                        <button onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer(activeGroup.members[0]); setExpParticipants(activeGroup.members); setShowExpenseModal(true); }} className="btn-primary px-5 py-2.5 text-sm font-bold shadow-md">เพิ่มบิล</button>
+                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                        <h3 className="font-bold text-xl w-full text-left">🧾 บิลทั้งหมด</h3>
+                                        <button onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer(activeGroup.members[0]); setExpParticipants(activeGroup.members); setShowExpenseModal(true); }} className="btn-primary w-full sm:w-auto px-8 py-4 text-base font-bold shadow-lg flex items-center justify-center gap-3">
+                                            <LucideIcon name="plus-circle" className="w-6 h-6" /> เพิ่มรายการบิล
+                                        </button>
                                     </div>
                                     <div className="grid gap-3">
                                         {expenses.map(e => (
-                                            <div key={e.id} className="glass-card p-4 flex justify-between items-center bg-white/70">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar name={e.payer} />
+                                            <div key={e.id} className="glass-card p-5 flex justify-between items-center bg-white/70 group/item">
+                                                <div className="flex items-center gap-4">
+                                                    <Avatar name={e.payer} size="md" />
                                                     <div>
-                                                        <h4 className="font-bold text-sm leading-tight">{e.description}</h4>
-                                                        <p className="text-[10px] text-slate-400">หาร: {e.participants.join(', ')}</p>
+                                                        <h4 className="font-bold text-base">{e.description}</h4>
+                                                        <p className="text-[11px] text-slate-500">จ่ายโดย <b>{e.payer}</b> • หาร {(e.participants || []).join(', ')}</p>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-base text-[#2B3A4A]">฿{formatMoney(e.amount)}</p>
-                                                    <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="text-[10px] text-blue-400 font-bold">แก้ไข</button>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right">
+                                                        <p className="font-bold text-lg text-[#2B3A4A]">฿{formatMoney(e.amount)}</p>
+                                                        <p className="text-[10px] text-slate-400">{new Date(e.date).toLocaleDateString('th-TH')}</p>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setEditingExpense(e); setExpDesc(e.description); setExpAmount(e.amount.toString()); setExpPayer(e.payer); setExpParticipants(e.participants); setShowExpenseModal(true); }} className="p-1.5 bg-blue-50 text-blue-400 rounded-lg"><LucideIcon name="edit-3" className="w-3.5 h-3.5" /></button>
+                                                        <button onClick={() => deleteExpense(e.id)} className="p-1.5 bg-red-50 text-red-400 rounded-lg"><LucideIcon name="trash-2" className="w-3.5 h-3.5" /></button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -561,22 +632,50 @@
                                 </div>
 
                                 {/* สรุปการเคลียร์เงิน */}
-                                <div className="glass-card p-6 bg-white/50">
-                                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><span className="text-2xl">💸</span> ใครต้องโอนให้ใคร</h3>
-                                    <div className="space-y-3">
+                                <div className="glass-card p-7 bg-white/50">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="font-bold text-lg flex items-center gap-2">💸 ใครต้องโอนให้ใคร</h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={exportImage} className="p-2.5 bg-white rounded-xl shadow-sm text-slate-400 hover:text-pink-400"><LucideIcon name="image" className="w-5 h-5" /></button>
+                                            <button onClick={copyDashboardLink} className="p-2.5 bg-white rounded-xl shadow-sm text-slate-400 hover:text-emerald-500"><LucideIcon name="share-2" className="w-5 h-5" /></button>
+                                            <button onClick={exportExcel} className="p-2.5 bg-white rounded-xl shadow-sm text-slate-400 hover:text-blue-500"><LucideIcon name="file-spreadsheet" className="w-5 h-5" /></button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
                                         {settlements.map((s, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 bg-white/90 rounded-2xl border border-white shadow-sm text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <Avatar name={s.from} size="sm" />
-                                                    <span className="font-bold">{s.from}</span>
-                                                    <LucideIcon name="arrow-right" className="w-3 h-3 text-slate-300" />
-                                                    <Avatar name={s.to} size="sm" />
-                                                    <span className="font-bold">{s.to}</span>
+                                            <div key={idx} className="flex items-center justify-between p-4 bg-white/90 rounded-[20px] border border-white shadow-sm">
+                                                <div className="flex items-center gap-3 flex-1">
+                                                    <Avatar name={s.from} />
+                                                    <span className="font-bold text-sm">{s.from}</span>
+                                                    <span className="text-[10px] font-bold text-slate-300">จ่ายให้</span>
+                                                    <Avatar name={s.to} />
+                                                    <span className="font-bold text-sm">{s.to}</span>
                                                 </div>
-                                                <p className="font-black text-[#89CFF0]">฿{formatMoney(s.amount)}</p>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">ต้องโอน</p>
+                                                    <p className="text-xl font-black text-[#89CFF0]">฿{formatMoney(s.amount)}</p>
+                                                </div>
                                             </div>
                                         ))}
-                                        {settlements.length === 0 && <p className="text-center py-4 text-sm font-bold opacity-30">ไม่มีการโอนค้างชำระ ✨</p>}
+                                        {settlements.length === 0 && <p className="text-center py-10 opacity-30 font-bold">ไม่มีการโอนค้างชำระ ✨</p>}
+                                    </div>
+                                </div>
+
+                                {/* จัดการสมาชิก */}
+                                <div className="glass-card p-7 bg-white/40">
+                                    <h4 className="text-[11px] font-bold text-slate-400 uppercase mb-4 tracking-widest">สมาชิกทริป</h4>
+                                    <div className="flex flex-wrap gap-2.5 mb-5">
+                                        {(activeGroup.members || []).map(m => (
+                                            <div key={m} className="bg-white px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-sm border border-white">
+                                                <Avatar name={m} />
+                                                <span className="text-sm font-bold">{m}</span>
+                                                <button onClick={() => removeMember(m)} className="text-slate-300 hover:text-red-400"><LucideIcon name="x" className="w-3 h-3" /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="เพิ่มชื่อเพื่อน..." className="flex-1 bg-white rounded-xl px-4 py-3 text-sm outline-none border border-white" />
+                                        <button onClick={addMember} className="btn-secondary px-5 rounded-xl font-bold">เพิ่ม</button>
                                     </div>
                                 </div>
                             </div>
@@ -587,23 +686,26 @@
                                 <div className="glass-card p-10 text-center bg-white/80">
                                     <div className="text-7xl mb-4">{getGroupStyle(activeGroup.id).emoji}</div>
                                     <h1 className="text-4xl font-black mb-6">{activeGroup.name}</h1>
-                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm mb-2">สรุปยอดรวม</p>
+                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm mb-2">ยอดรวมใช้จ่ายทริป</p>
                                     <p className="text-6xl font-black text-[#FF9EAE]">฿{formatMoney(totalSpent)}</p>
                                 </div>
-
-                                <div className="glass-card p-6">
-                                    <h3 className="font-bold text-xl mb-6 border-b pb-4">📊 สรุปแต่ละคน</h3>
-                                    <div className="grid gap-4">
+                                <div className="glass-card p-7">
+                                    <h3 className="font-bold text-xl mb-6">📊 สรุปแต่ละคน</h3>
+                                    <div className="space-y-4">
                                         {individualShares.map((item, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-white/80 rounded-2xl">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar name={item.name} size="md" />
-                                                    <span className="font-bold">{item.name}</span>
-                                                </div>
-                                                <div className="text-right">
+                                            <div key={idx} className="p-6 bg-white/80 rounded-[24px] border border-white shadow-sm flex flex-col gap-4">
+                                                <div className="flex justify-between items-center border-b pb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <Avatar name={item.name} size="md" />
+                                                        <span className="font-bold">{item.name}</span>
+                                                    </div>
                                                     <p className={`font-bold ${item.balance >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                                        {item.balance >= 0 ? `ได้คืน ฿${formatMoney(item.balance)}` : `จ่ายเพิ่ม ฿${formatMoney(Math.abs(item.balance))}`}
+                                                        {item.balance >= 0 ? `ได้คืน ฿${formatMoney(item.balance)}` : `ต้องจ่าย ฿${formatMoney(Math.abs(item.balance))}`}
                                                     </p>
+                                                </div>
+                                                <div className="grid grid-cols-2">
+                                                    <div><p className="text-[10px] font-bold text-slate-400">จ่ายแล้ว</p><p className="font-bold text-[#89CFF0]">฿{formatMoney(item.paid)}</p></div>
+                                                    <div className="text-right"><p className="text-[10px] font-bold text-slate-400">ยอดที่ต้องหาร</p><p className="font-bold text-[#FF9EAE]">฿{formatMoney(item.share)}</p></div>
                                                 </div>
                                             </div>
                                         ))}
@@ -615,58 +717,86 @@
 
                     {/* Modals */}
                     {showAddGroup && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/20 backdrop-blur-sm animate-pop">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-md">
                             <div className="glass-card p-10 w-full max-w-sm text-center bg-white">
                                 <h3 className="text-2xl font-bold mb-6">ทริปใหม่ไปไหนดี? ⛺</h3>
-                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="ชื่อทริป..." className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-center font-bold text-lg mb-6 outline-none ring-pink-100 focus:ring-4" />
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowAddGroup(false)} className="flex-1 py-3 text-slate-400 font-bold">ปิด</button>
-                                    <button onClick={createGroup} className="btn-primary flex-2 py-3 px-8 font-bold shadow-md">สร้าง</button>
+                                <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="ชื่อทริป..." className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-center font-bold text-lg mb-8 outline-none focus:ring-4 ring-pink-100" />
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowAddGroup(false)} className="flex-1 py-4 font-bold text-slate-400">ยกเลิก</button>
+                                    <button onClick={createGroup} className="btn-primary flex-2 py-4 font-bold shadow-lg">เริ่มเลย!</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {showJoinGroup && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/20 backdrop-blur-sm animate-pop">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/20 backdrop-blur-md">
                             <div className="glass-card p-10 w-full max-w-sm text-center bg-white">
                                 <h3 className="text-2xl font-bold mb-6">เข้าทริปเพื่อน ✈️</h3>
-                                <input autoFocus value={joinId} onChange={e => setJoinId(e.target.value)} placeholder="กรอกรหัสกลุ่ม..." className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-center font-mono text-sm mb-6 outline-none" />
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowJoinGroup(false)} className="flex-1 py-3 text-slate-400 font-bold">ปิด</button>
-                                    <button onClick={joinGroup} className="btn-secondary flex-2 py-3 px-8 font-bold shadow-md">เข้ากลุ่ม</button>
+                                <input autoFocus value={joinId} onChange={e => setJoinId(e.target.value)} placeholder="รหัส ID กลุ่ม..." className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-center font-mono mb-8 outline-none" />
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowJoinGroup(false)} className="flex-1 py-4 font-bold text-slate-400">ยกเลิก</button>
+                                    <button onClick={joinGroup} className="btn-secondary flex-2 py-4 font-bold shadow-lg">เข้าร่วม</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {showExpenseModal && (
-                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-pop">
-                            <div className="bg-white w-full max-w-lg sm:rounded-[32px] rounded-t-[32px] p-8 max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#FFB6C1]">
-                                <h3 className="text-2xl font-bold mb-8">จดบิลใหม่ 🧾</h3>
-                                <div className="space-y-6">
+                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm">
+                            <div className="bg-white w-full max-w-xl sm:rounded-[32px] rounded-t-[32px] p-8 max-h-[90vh] overflow-y-auto no-scrollbar border-t-8 border-[#FFB6C1]">
+                                <h3 className="text-2xl font-bold mb-8">จดบิล 🧾</h3>
+                                <div className="space-y-8">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">จ่ายค่าอะไร?</label>
-                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าข้าว" className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold outline-none" />
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">จ่ายค่าอะไร?</label>
+                                        <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="เช่น ค่าข้าว" className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-lg outline-none" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">จำนวนเงิน (฿)</label>
-                                        <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0.00" className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-2xl text-[#89CFF0] outline-none" />
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">จำนวนเงิน (฿)</label>
+                                        <div className="bg-slate-50 rounded-3xl p-5 border-2 border-slate-100">
+                                            <input value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0.00 หรือ 100+20" className="w-full bg-transparent text-xl font-bold outline-none mb-2" />
+                                            <div className="text-right border-t pt-3 mt-2"><span className="text-4xl font-black text-[#89CFF0]">฿{formatMoney(evaluateMath(expAmount))}</span></div>
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">ใครจ่าย?</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">ใครจ่าย?</label>
                                         <div className="flex flex-wrap gap-2">
                                             {activeGroup.members.map(m => (
                                                 <button key={m} onClick={() => setExpPayer(m)} className={`px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${expPayer === m ? 'border-[#FFB6C1] bg-[#FFF0F5]' : 'border-slate-100 bg-slate-50'}`}>{m}</button>
                                             ))}
                                         </div>
                                     </div>
-                                    <button onClick={saveExpense} className="w-full btn-primary py-4 text-lg font-bold shadow-xl mt-4">บันทึกบิล ✨</button>
-                                    <button onClick={() => setShowExpenseModal(false)} className="w-full text-slate-300 font-bold text-sm py-2">ยกเลิก</button>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">หารกับใครบ้าง?</label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {activeGroup.members.map(m => {
+                                                const isSel = expParticipants.includes(m);
+                                                return <button key={m} onClick={() => isSel ? setExpParticipants(expParticipants.filter(p => p !== m)) : setExpParticipants([...expParticipants, m])} className={`p-3 rounded-2xl border-2 font-bold text-sm ${isSel ? 'border-[#FFB6C1] bg-[#FFF0F5]' : 'border-slate-100'}`}>{m}</button>
+                                            })}
+                                        </div>
+                                    </div>
+                                    <button onClick={saveExpense} className="w-full btn-primary py-5 text-xl font-bold shadow-xl mt-4">บันทึกบิล ✨</button>
+                                    <button onClick={() => setShowExpenseModal(false)} className="w-full py-2 text-slate-300 font-bold">ปิด</button>
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {/* Export Area (Hidden from UI, used by html2canvas) */}
+                    <div id="export-area" className="bg-gradient-to-br from-[#FFE4E1] via-[#FFF0F5] to-[#E0F7FA] p-[60px]">
+                        <div className="w-full max-w-[1080px] mx-auto space-y-[40px]">
+                            <div className="flex items-center justify-between bg-white/70 p-[40px] rounded-[40px] border-4 border-white shadow-lg">
+                                <div className="flex items-center gap-[30px]">
+                                    <GroupIcon id={activeGroup?.id} size="xl" className="w-[140px] h-[140px] text-[70px]" />
+                                    <div><h2 className="text-[60px] font-black text-[#2B3A4A]">{activeGroup?.name}</h2><p className="text-[20px] font-bold uppercase tracking-[8px] text-slate-400">Trip Summary Report</p></div>
+                                </div>
+                                <div className="text-right bg-white p-[30px] rounded-[30px] border-4 border-white shadow-sm"><p className="text-[18px] text-slate-400 font-bold mb-2">TOTAL SPENT</p><p className="text-[70px] font-black text-[#FF9EAE]">฿{formatMoney(totalSpent)}</p></div>
+                            </div>
+                            <div className="bg-white/60 p-[40px] rounded-[40px] border-[6px] border-white shadow-xl"><h3 className="text-[32px] font-bold border-l-[10px] border-[#FF9EAE] pl-[20px] mb-[30px]">Individual Shares</h3><div className="grid grid-cols-2 gap-[20px]">{individualShares.map((i,idx)=>(<div key={idx} className="bg-white p-[30px] rounded-[24px] border-4 border-white shadow-sm flex justify-between items-center"><div className="flex items-center gap-4"><Avatar name={i.name} size="lg" /><span className="text-[28px] font-bold">{i.name}</span></div><div className="text-right"><p className="text-[24px] font-black text-[#89CFF0]">฿{formatMoney(i.paid)}</p><p className="text-[14px] font-bold text-slate-400">PAID</p></div></div>))}</div></div>
+                            <div className="bg-white/60 p-[40px] rounded-[40px] border-[6px] border-white shadow-xl"><h3 className="text-[32px] font-bold border-l-[10px] border-[#89CFF0] pl-[20px] mb-[30px]">Settlements (To Transfer)</h3><div className="space-y-[20px]">{settlements.map((s,idx)=>(<div key={idx} className="flex items-center justify-between bg-white p-[30px] rounded-[24px] border-4 border-white shadow-md"><div className="flex items-center gap-6"><Avatar name={s.from} size="lg" /><span className="text-[28px] font-bold">{s.from}</span><span className="text-[20px] text-slate-300 font-bold">Transfer to</span><Avatar name={s.to} size="lg" /><span className="text-[28px] font-bold">{s.to}</span></div><p className="text-[40px] font-black text-[#89CFF0]">฿{formatMoney(s.amount)}</p></div>))}</div></div>
+                            <div className="text-center"><p className="text-[24px] text-slate-400 font-black tracking-[12px] uppercase">Generated by Expense Pro 🧸</p></div>
+                        </div>
+                    </div>
                 </div>
             );
         }
