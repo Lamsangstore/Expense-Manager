@@ -177,10 +177,64 @@
             body { font-size: 13px; }
             .glass-card { border-radius: 16px; }
         }
+
+        /* ── Dark Mode ──────────────────────────────────────────── */
+        body.dark {
+            background: linear-gradient(135deg, #1a1625 0%, #1e1b2e 40%, #1a2030 100%);
+            color: #e2e8f0;
+        }
+        body.dark .glass-card {
+            background: rgba(30, 27, 46, 0.75);
+            border-color: rgba(255,255,255,0.08);
+            box-shadow: 0 8px 30px -6px rgba(0,0,0,0.4);
+        }
+        body.dark .btn-primary { background: linear-gradient(135deg,#c4788a,#d4889a); border-bottom-color:#a06070; }
+        body.dark .btn-secondary { background: linear-gradient(135deg,#4a8fa0,#5a9fb0); border-bottom-color:#3a7f90; }
+        body.dark .section-pink  { background: linear-gradient(135deg,rgba(255,182,193,0.1),rgba(255,192,203,0.05)); border-color:rgba(255,182,193,0.2); }
+        body.dark .section-blue  { background: linear-gradient(135deg,rgba(176,224,230,0.1),rgba(173,216,230,0.05)); border-color:rgba(173,216,230,0.2); }
+        body.dark .section-purple{ background: linear-gradient(135deg,rgba(189,178,255,0.1),rgba(216,191,255,0.05)); border-color:rgba(189,178,255,0.2); }
+        body.dark .section-mint  { background: linear-gradient(135deg,rgba(181,234,215,0.1),rgba(196,247,227,0.05)); border-color:rgba(181,234,215,0.2); }
+        body.dark .section-peach { background: linear-gradient(135deg,rgba(255,218,185,0.1),rgba(255,200,150,0.05)); border-color:rgba(255,218,185,0.2); }
+        body.dark input, body.dark textarea { background: rgba(255,255,255,0.07) !important; color: #e2e8f0 !important; border-color: rgba(255,255,255,0.1) !important; }
+        body.dark .bg-white { background-color: rgba(255,255,255,0.06) !important; }
+        body.dark .bg-white\/80, body.dark .bg-white\/90, body.dark .bg-white\/70 { background-color: rgba(255,255,255,0.07) !important; }
+        body.dark .bg-slate-50, body.dark .bg-slate-100 { background-color: rgba(255,255,255,0.05) !important; }
+        body.dark .text-slate-400 { color: #94a3b8; }
+        body.dark .text-slate-500 { color: #a0aec0; }
+        body.dark .text-\[#2B3A4A\], body.dark .text-\[\\#2B3A4A\] { color: #e2e8f0 !important; }
+        body.dark .border-slate-100, body.dark .border-slate-200 { border-color: rgba(255,255,255,0.08) !important; }
+        body.dark .shadow-md, body.dark .shadow-sm { box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+        body.dark .bg-emerald-50 { background-color: rgba(5,150,105,0.15) !important; }
+        body.dark .bg-red-50 { background-color: rgba(239,68,68,0.15) !important; }
+
+        /* ── Toast ──────────────────────────────────────────────── */
+        #toast-container { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; }
+        .toast { padding:10px 18px; border-radius:999px; font-size:13px; font-weight:700; font-family:var(--font-body); color:white; box-shadow:0 8px 24px rgba(0,0,0,0.18); pointer-events:none; animation:toastIn 0.3s cubic-bezier(0.175,0.885,0.32,1.275) both; white-space:nowrap; max-width:90vw; text-align:center; }
+        .toast.out { animation:toastOut 0.25s ease-in both; }
+        .toast-success { background:linear-gradient(135deg,#4ade80,#22c55e); }
+        .toast-error   { background:linear-gradient(135deg,#f87171,#ef4444); }
+        .toast-info    { background:linear-gradient(135deg,#60a5fa,#3b82f6); }
+        .toast-warning { background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1c1c1c; }
+        @keyframes toastIn  { from{opacity:0;transform:translateY(12px) scale(0.9)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes toastOut { from{opacity:1;transform:translateY(0) scale(1)} to{opacity:0;transform:translateY(8px) scale(0.9)} }
+
+        /* ── Skeleton ───────────────────────────────────────────── */
+        .skeleton { background:linear-gradient(90deg,rgba(200,200,200,0.2) 25%,rgba(200,200,200,0.4) 50%,rgba(200,200,200,0.2) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:12px; }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        body.dark .skeleton { background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.1) 50%,rgba(255,255,255,0.04) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+
+        /* ── Paid settlement ────────────────────────────────────── */
+        .settlement-paid { opacity:0.45; }
+        .settlement-paid .settlement-text { text-decoration:line-through; }
+        .paid-badge { background:linear-gradient(135deg,#4ade80,#22c55e); color:white; font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; }
+
+        /* ── CountUp number ─────────────────────────────────────── */
+        .count-up { transition: all 0.05s; }
     </style>
 </head>
 <body>
     <div id="root"></div>
+    <div id="toast-container"></div>
 
     <script type="text/babel" data-presets="react,env">
         const { useState, useEffect, useMemo, useRef, useCallback } = React;
@@ -209,9 +263,9 @@
         const handlePermissionError = (e, ctx) => {
             console.error(`${ctx}:`, e);
             if (e.message && (e.message.includes('permission') || e.message.includes('insufficient'))) {
-                alert(`⚠️ ${ctx}\nFirestore Permission Denied — ตรวจสอบ Rules ใน Firebase Console`);
+                showToast(`⚠️ ${ctx} — Permission Denied`, 'error', 4000);
             } else {
-                alert(`${ctx}: ${e.message}`);
+                showToast(`${ctx}`, 'error', 4000);
             }
         };
 
@@ -267,6 +321,42 @@
         ];
         const DEFAULT_AVATAR_SHAPE = 'rounded';
 
+        // ── Toast utility (แทน alert) ───────────────────────────────────────────
+        const showToast = (msg, type = 'success', duration = 2800) => {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const el = document.createElement('div');
+            el.className = `toast toast-${type}`;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.classList.add('out');
+                setTimeout(() => el.remove(), 280);
+            }, duration);
+        };
+
+        // ── CountUp hook ────────────────────────────────────────────────────────
+        function useCountUp(target, duration = 800) {
+            const [display, setDisplay] = useState(target);
+            const prev = useRef(target);
+            useEffect(() => {
+                const start = prev.current;
+                const diff = target - start;
+                if (diff === 0) return;
+                const steps = Math.max(20, Math.round(duration / 16));
+                let step = 0;
+                const timer = setInterval(() => {
+                    step++;
+                    const progress = step / steps;
+                    const ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+                    setDisplay(start + diff * ease);
+                    if (step >= steps) { setDisplay(target); prev.current = target; clearInterval(timer); }
+                }, 16);
+                return () => clearInterval(timer);
+            }, [target]);
+            return display;
+        }
+
         function App() {
             const urlParams = new URLSearchParams(window.location.search);
             const dashIdFromUrl = urlParams.get('dashboard');
@@ -279,6 +369,11 @@
             const [loading, setLoading] = useState(true);
             const [exporting, setExporting] = useState(false);
             const [dashError, setDashError] = useState('');
+            const [darkMode, setDarkMode] = useState(() => localStorage.getItem('ep_dark') === '1');
+            // paidSettlements: Set of "from→to" keys that user marked as paid
+            const [paidSettlements, setPaidSettlements] = useState(() => {
+                try { return new Set(JSON.parse(localStorage.getItem('ep_paid') || '[]')); } catch { return new Set(); }
+            });
 
             // Modals
             const [showAddGroup, setShowAddGroup] = useState(false);
@@ -314,6 +409,25 @@
             const [memberNewEmoji, setMemberNewEmoji] = useState('');
             const [memberNewColor, setMemberNewColor] = useState('');
             const [memberNewShape, setMemberNewShape] = useState(DEFAULT_AVATAR_SHAPE);
+
+            // ── Dark mode effect ───────────────────────────────────────────────
+            useEffect(() => {
+                document.body.classList.toggle('dark', darkMode);
+                localStorage.setItem('ep_dark', darkMode ? '1' : '0');
+            }, [darkMode]);
+
+            // ── Paid settlements helpers ───────────────────────────────────────
+            const settlementKey = (s) => `${s.from}→${s.to}`;
+            const togglePaid = (s) => {
+                const key = settlementKey(s);
+                setPaidSettlements(prev => {
+                    const next = new Set(prev);
+                    if (next.has(key)) { next.delete(key); showToast('ยกเลิกแล้ว ↩️', 'warning'); }
+                    else { next.add(key); showToast(`${s.from} โอนให้ ${s.to} แล้ว ✅`, 'success'); }
+                    localStorage.setItem('ep_paid', JSON.stringify([...next]));
+                    return next;
+                });
+            };
 
             // ── Auth (with remember login) ────────────────────────────────────────
             useEffect(() => {
@@ -393,7 +507,7 @@
                                 setClaimNewName(myName);
                                 setShowClaimMember(true);
                             }
-                        } else alert("ลิงก์เชิญไม่ถูกต้อง");
+                        } else showToast("ลิงก์เชิญไม่ถูกต้อง ❌", "error");
                     } catch (e) { handlePermissionError(e, "เข้าร่วมอัตโนมัติไม่สำเร็จ"); }
                 };
                 process();
@@ -497,6 +611,7 @@
                     });
                     setNewGroupName(''); setNewGroupEmoji('✈️'); setNewGroupColor('#FFD1DC');
                     setShowAddGroup(false);
+                    showToast('สร้างทริปแล้ว 🏕️', 'success');
                 } catch (e) { handlePermissionError(e, "สร้างกลุ่มไม่สำเร็จ"); }
             };
 
@@ -516,7 +631,7 @@
                     const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                     const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim());
                     const doc = await ref.get();
-                    if (!doc.exists) { alert("ไม่พบกลุ่มนี้"); return; }
+                    if (!doc.exists) { showToast("ไม่พบกลุ่มนี้ ❌", "error"); return; }
                     const data = doc.data();
                     setJoinId(''); setShowJoinGroup(false);
                     // ถ้าชื่อตรงอยู่แล้ว → เข้าตรงเลย
@@ -566,6 +681,7 @@
                     setShowClaimMember(false);
                     setClaimGroupData(null);
                     setView('detail');
+                    showToast(`เข้าร่วม "${claimGroupData.groupDoc?.name}" แล้ว 🎉`, 'success');
                 } catch (e) { handlePermissionError(e, "ยืนยันการเข้าร่วมไม่สำเร็จ"); }
             };
 
@@ -575,7 +691,7 @@
                 // หาข้อมูลกลุ่มเพื่อเช็ค ownerId
                 const group = groups.find(g => g.id === id);
                 if (group && group.ownerId !== user.uid) {
-                    alert("เฉพาะผู้สร้างกลุ่มเท่านั้นที่ลบได้ครับ 🔒");
+                    showToast("เฉพาะผู้สร้างเท่านั้นที่ลบได้ 🔒", "warning");
                     return;
                 }
                 if (confirm("ต้องการลบกลุ่มและข้อมูลทั้งหมดถาวรหรือไม่?")) {
@@ -604,6 +720,7 @@
                         updates.members = firebase.firestore.FieldValue.arrayRemove(myName);
                     }
                     await ref.update(updates);
+                    showToast('ออกจากกลุ่มแล้ว 👋', 'info');
                 } catch (e) { handlePermissionError(e, "ออกจากกลุ่มไม่สำเร็จ"); }
             };
 
@@ -680,6 +797,7 @@
                     }
                     setShowMemberEditor(false);
                     setEditingMemberData(null);
+                    showToast('บันทึกข้อมูลสมาชิกแล้ว ✨', 'success');
                 } catch (e) { handlePermissionError(e, "แก้ไขสมาชิกไม่สำเร็จ"); }
             };
 
@@ -692,6 +810,7 @@
                     const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
                     if (editingExpense) await ref.doc(editingExpense.id).update(data);
                     else await ref.add(data);
+                    showToast(editingExpense ? 'แก้ไขบิลแล้ว ✏️' : 'เพิ่มบิลแล้ว 🧾', 'success');
                     setShowExpenseModal(false); setEditingExpense(null);
                 } catch (e) { handlePermissionError(e, "บันทึกบิลไม่สำเร็จ"); }
             };
@@ -699,7 +818,10 @@
             const deleteExpense = async (id) => {
                 if (!user || user.isAnonymous || !activeGroup) return;
                 if (confirm("ลบรายการนี้ใช่หรือไม่?")) {
-                    try { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete(); }
+                    try {
+                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
+                        showToast('ลบบิลแล้ว 🗑️', 'info');
+                    }
                     catch (e) { handlePermissionError(e, "ลบบิลไม่สำเร็จ"); }
                 }
             };
@@ -709,8 +831,8 @@
                 const base = window.location.href.split('?')[0];
                 const url = `${base}?join=${activeGroup.id}`;
                 navigator.clipboard?.writeText(url) || fallbackCopy(url);
-                if (base.startsWith('blob:')) alert("⚠️ Preview mode — upload to web hosting first");
-                else alert("คัดลอกลิงก์เชิญแล้ว! 🔗✨");
+                if (base.startsWith("blob:")) { showToast("⚠️ Preview mode — upload to hosting first", "warning", 4000); return; }
+                else showToast("คัดลอกลิงก์เชิญแล้ว! 🔗", "success");
             };
 
             const copyDashboardLink = () => {
@@ -718,8 +840,8 @@
                 const base = window.location.href.split('?')[0];
                 const url = `${base}?dashboard=${activeGroup.id}`;
                 navigator.clipboard?.writeText(url) || fallbackCopy(url);
-                if (base.startsWith('blob:')) alert("⚠️ Preview mode");
-                else alert("คัดลอกลิงก์ Dashboard แล้ว! 📊✨");
+                if (base.startsWith("blob:")) { showToast("⚠️ Preview mode", "warning"); return; }
+                else showToast("คัดลอกลิงก์ Dashboard แล้ว! 📊", "success");
             };
 
             const fallbackCopy = (text) => {
@@ -803,6 +925,16 @@
             }, [activeGroup, expenses]);
 
             // ── Sub-components ─────────────────────────────────────────────────────
+            const countUpTotal = useCountUp(totalSpent);
+
+            // Dark mode toggle button (reused in header)
+            const DarkToggle = () => (
+                <button onClick={() => setDarkMode(d => !d)}
+                    className="p-2 rounded-xl hover:bg-white/30 transition-all text-slate-400"
+                    title={darkMode ? 'Light mode' : 'Dark mode'}>
+                    <span className="text-base leading-none">{darkMode ? '☀️' : '🌙'}</span>
+                </button>
+            );
             const GroupIcon = ({ group, size = "md" }) => {
                 const style = getGroupStyle(group);
                 let cls = "";
@@ -836,8 +968,31 @@
                 );
             };
 
+            const SkeletonCard = () => (
+                <div className="glass-card p-4 bg-white/40">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="skeleton w-16 h-16 rounded-[20px]"></div>
+                        <div className="flex-1 space-y-2">
+                            <div className="skeleton h-4 w-3/4 rounded-xl"></div>
+                            <div className="skeleton h-3 w-1/2 rounded-xl"></div>
+                        </div>
+                    </div>
+                    <div className="flex gap-1">
+                        {[1,2,3].map(i => <div key={i} className="skeleton w-7 h-7 rounded-full"></div>)}
+                    </div>
+                </div>
+            );
+
             // ── Loading Screen ─────────────────────────────────────────────────────
-            if (loading) return <div className="h-screen flex items-center justify-center"><div className="loader"></div></div>;
+            if (loading) return (
+                <div className="min-h-screen pb-16">
+                    <div className="p-3"><div className="max-w-2xl mx-auto glass-card px-4 py-2.5 flex items-center justify-between shadow-md"><div className="skeleton h-6 w-32 rounded-xl"></div><div className="skeleton h-9 w-9 rounded-[16px]"></div></div></div>
+                    <div className="max-w-2xl mx-auto px-3 mt-4 space-y-4">
+                        <div className="skeleton h-24 w-full rounded-[20px]"></div>
+                        {[1,2,3].map(i=><SkeletonCard key={i}/>)}
+                    </div>
+                </div>
+            );
 
             // ── Login Screen ───────────────────────────────────────────────────────
             if (!user || (user.isAnonymous && !dashIdFromUrl && view !== 'dashboard')) {
@@ -878,7 +1033,8 @@
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
+                                <DarkToggle />
                                 {(!user || user.isAnonymous) ? (
                                     <button onClick={handleLogin} className="text-xs font-bold bg-white px-3 py-1.5 rounded-xl shadow-sm">เข้าสู่ระบบ</button>
                                 ) : (
@@ -989,7 +1145,7 @@
                                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[3px] mb-4">สรุปรายการใช้จ่ายทริป</p>
                                     <div className="bg-white/80 p-4 rounded-2xl border-2 border-white inline-block">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ยอดรวมทั้งหมด</p>
-                                        <p className="text-4xl font-black text-[#FF9EAE]">฿{formatMoney(totalSpent)}</p>
+                                        <p className="text-4xl font-black text-[#FF9EAE] count-up">฿{formatMoney(countUpTotal)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1083,7 +1239,7 @@
                                             <button onClick={shareLink} className="bg-white p-1.5 rounded-xl shadow-sm hover:text-blue-500 text-slate-400"><LucideIcon name="user-plus" className="w-3.5 h-3.5" /></button>
                                         </div>
                                     </div>
-                                    <h1 className="text-4xl font-black mb-4 text-[#2B3A4A] tracking-tight">฿{formatMoney(totalSpent)}</h1>
+                                    <h1 className="text-4xl font-black mb-4 text-[#2B3A4A] tracking-tight count-up">฿{formatMoney(countUpTotal)}</h1>
                                     <div className="flex flex-wrap gap-1.5">
                                         {(activeGroup.members||[]).map(m => (
                                             <div key={m} className="bg-white/80 px-2.5 py-1 rounded-xl border border-white flex items-center gap-1.5 shadow-sm text-[11px] font-bold">
@@ -1160,21 +1316,34 @@
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    {settlements.map((s, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-white/90 rounded-2xl border border-white shadow-sm">
-                                            <div className="flex items-center gap-1.5 flex-1">
+                                    {settlements.map((s, idx) => {
+                                        const key = settlementKey(s);
+                                        const isPaid = paidSettlements.has(key);
+                                        return (
+                                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border border-white shadow-sm transition-all ${isPaid ? 'settlement-paid bg-white/50' : 'bg-white/90'}`}>
+                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                                 <Avatar name={s.from} group={activeGroup} size="xs" />
-                                                <span className="font-bold text-xs">{s.from}</span>
-                                                <div className="bg-[#E0F7FA] text-[#55ABC8] px-1.5 py-0.5 rounded-full text-[9px] font-bold">➔</div>
+                                                <span className={`font-bold text-xs settlement-text`}>{s.from}</span>
+                                                <div className="bg-[#E0F7FA] text-[#55ABC8] px-1.5 py-0.5 rounded-full text-[9px] font-bold shrink-0">➔</div>
                                                 <Avatar name={s.to} group={activeGroup} size="xs" />
-                                                <span className="font-bold text-xs">{s.to}</span>
+                                                <span className={`font-bold text-xs settlement-text`}>{s.to}</span>
+                                                {isPaid && <span className="paid-badge shrink-0">โอนแล้ว</span>}
                                             </div>
-                                            <div className="pl-3 border-l border-slate-100 text-right">
-                                                <p className="text-[9px] text-slate-400">ต้องโอน</p>
-                                                <p className="text-sm font-black text-[#89CFF0]">฿{formatMoney(s.amount)}</p>
+                                            <div className="flex items-center gap-2 pl-2 shrink-0">
+                                                <div className="text-right">
+                                                    <p className="text-[9px] text-slate-400">ต้องโอน</p>
+                                                    <p className={`text-sm font-black ${isPaid ? 'text-slate-300 line-through' : 'text-[#89CFF0]'}`}>฿{formatMoney(s.amount)}</p>
+                                                </div>
+                                                <button onClick={() => togglePaid(s)}
+                                                    className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm text-sm
+                                                        ${isPaid ? 'bg-emerald-100 text-emerald-500 hover:bg-red-50 hover:text-red-400' : 'bg-white text-slate-300 hover:bg-emerald-50 hover:text-emerald-500 border border-slate-100'}`}
+                                                    title={isPaid ? 'ยกเลิก' : 'โอนแล้ว'}>
+                                                    {isPaid ? '✓' : '○'}
+                                                </button>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                     {settlements.length === 0 && <p className="text-center opacity-40 text-xs py-6">ไม่มีการโอนค้างชำระ ✨</p>}
                                 </div>
                             </div>
