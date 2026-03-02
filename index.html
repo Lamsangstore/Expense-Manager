@@ -1301,7 +1301,29 @@
                     {/* ─── DETAIL VIEW ───────────────────────────────────────────── */}
                     {view === 'detail' && activeGroup && (
                         <div className="space-y-4">
-                            {/* Hero */}
+
+                            {/* 1. จัดการสมาชิก */}
+                            <div className="glass-card p-4 section-peach">
+                                <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2 mb-4">
+                                    <span className="text-2xl">👥</span> จัดการสมาชิก
+                                </h3>
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {(activeGroup.members||[]).map(m => (
+                                        <div key={m} className="bg-white px-2.5 py-1.5 rounded-xl flex items-center gap-2 shadow-sm border border-white">
+                                            <Avatar name={m} group={activeGroup} size="xs" />
+                                            <span className="text-xs font-bold">{m}</span>
+                                            <button onClick={() => openMemberEditor(m)} className="text-slate-300 hover:text-blue-400 p-0.5 rounded transition-colors"><LucideIcon name="edit-2" className="w-2.5 h-2.5" /></button>
+                                            <button onClick={() => removeMember(m)} className="text-slate-300 hover:text-red-400 p-0.5 rounded transition-colors"><LucideIcon name="x" className="w-2.5 h-2.5" /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} onKeyDown={e => e.key==='Enter' && addMember()} placeholder="พิมพ์ชื่อเพื่อน..." className="flex-1 bg-white rounded-xl px-3 py-2 text-xs font-medium outline-none border border-slate-100 focus:ring-2 ring-[#FFD1DC]" />
+                                    <button onClick={addMember} className="btn-secondary px-3 text-xs font-bold rounded-xl flex items-center gap-1"><LucideIcon name="user-plus" className="w-3.5 h-3.5" /> เพิ่ม</button>
+                                </div>
+                            </div>
+
+                            {/* 2. ยอดรวมทั้งหมด */}
                             <div className="glass-card p-5 relative overflow-hidden section-pink">
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 overflow-hidden">
                                     <span className="text-[200px] leading-none transform rotate-12 scale-125 blur-xl">{getGroupStyle(activeGroup).emoji}</span>
@@ -1326,7 +1348,52 @@
                                 </div>
                             </div>
 
-                            {/* Bills */}
+                            {/* 3. เคลียร์เงิน */}
+                            <div className="glass-card p-5 section-mint">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2">
+                                        <span className="text-2xl">💸</span> เคลียร์เงิน
+                                    </h3>
+                                    <div className="flex gap-1.5">
+                                        <button onClick={exportImage} title="Export Image" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-pink-400"><LucideIcon name="image" className="w-4 h-4" /></button>
+                                        <button onClick={copyDashboardLink} title="Dashboard Link" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-emerald-500"><LucideIcon name="link" className="w-4 h-4" /></button>
+                                        <button onClick={exportExcel} title="Excel" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-blue-500"><LucideIcon name="file-spreadsheet" className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    {settlements.map((s, idx) => {
+                                        const key = settlementKey(s);
+                                        const isPaid = paidSettlements.has(key);
+                                        return (
+                                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border border-white shadow-sm transition-all ${isPaid ? 'settlement-paid bg-white/50' : 'bg-white/90'}`}>
+                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                <Avatar name={s.from} group={activeGroup} size="xs" />
+                                                <span className="font-bold text-xs settlement-text">{s.from}</span>
+                                                <div className="bg-[#E0F7FA] text-[#55ABC8] px-1.5 py-0.5 rounded-full text-[9px] font-bold shrink-0">➔</div>
+                                                <Avatar name={s.to} group={activeGroup} size="xs" />
+                                                <span className="font-bold text-xs settlement-text">{s.to}</span>
+                                                {isPaid && <span className="paid-badge shrink-0">โอนแล้ว</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2 pl-2 shrink-0">
+                                                <div className="text-right">
+                                                    <p className="text-[9px] text-slate-400">ต้องโอน</p>
+                                                    <p className={`text-sm font-black ${isPaid ? 'text-slate-300 line-through' : 'text-[#89CFF0]'}`}>฿{formatMoney(s.amount)}</p>
+                                                </div>
+                                                <button onClick={() => togglePaid(s)}
+                                                    className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm text-sm
+                                                        ${isPaid ? 'bg-emerald-100 text-emerald-500 hover:bg-red-50 hover:text-red-400' : 'bg-white text-slate-300 hover:bg-emerald-50 hover:text-emerald-500 border border-slate-100'}`}
+                                                    title={isPaid ? 'ยกเลิก' : 'โอนแล้ว'}>
+                                                    {isPaid ? '✓' : '○'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        );
+                                    })}
+                                    {settlements.length === 0 && <p className="text-center opacity-40 text-xs py-6">ไม่มีการโอนค้างชำระ ✨</p>}
+                                </div>
+                            </div>
+
+                            {/* 4. บิลทั้งหมด */}
                             <div className="glass-card p-4 section-purple">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2">
@@ -1363,98 +1430,7 @@
                                 </div>
                             </div>
 
-                            {/* Members */}
-                            <div className="glass-card p-4 section-peach">
-                                <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2 mb-4">
-                                    <span className="text-2xl">👥</span> จัดการสมาชิก
-                                </h3>
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                    {(activeGroup.members||[]).map(m => (
-                                        <div key={m} className="bg-white px-2.5 py-1.5 rounded-xl flex items-center gap-2 shadow-sm border border-white">
-                                            <Avatar name={m} group={activeGroup} size="xs" />
-                                            <span className="text-xs font-bold">{m}</span>
-                                            <button onClick={() => openMemberEditor(m)} className="text-slate-300 hover:text-blue-400 p-0.5 rounded transition-colors"><LucideIcon name="edit-2" className="w-2.5 h-2.5" /></button>
-                                            <button onClick={() => removeMember(m)} className="text-slate-300 hover:text-red-400 p-0.5 rounded transition-colors"><LucideIcon name="x" className="w-2.5 h-2.5" /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} onKeyDown={e => e.key==='Enter' && addMember()} placeholder="พิมพ์ชื่อเพื่อน..." className="flex-1 bg-white rounded-xl px-3 py-2 text-xs font-medium outline-none border border-slate-100 focus:ring-2 ring-[#FFD1DC]" />
-                                    <button onClick={addMember} className="btn-secondary px-3 text-xs font-bold rounded-xl flex items-center gap-1"><LucideIcon name="user-plus" className="w-3.5 h-3.5" /> เพิ่ม</button>
-                                </div>
-                            </div>
-
-                            {/* Hero — ยอดรวมทั้งหมด */}
-                            <div className="glass-card p-5 relative overflow-hidden section-pink">
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 overflow-hidden">
-                                    <span className="text-[200px] leading-none transform rotate-12 scale-125 blur-xl">{getGroupStyle(activeGroup).emoji}</span>
-                                </div>
-                                <div className="relative z-10">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest bg-white/60 px-2 py-0.5 rounded-full">ยอดรวมใช้จ่าย</p>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[9px] font-mono bg-white/80 px-1.5 py-0.5 rounded-lg border border-white font-bold">ID: {activeGroup.id.slice(0,8)}…</span>
-                                            <button onClick={shareLink} className="bg-white p-1.5 rounded-xl shadow-sm hover:text-blue-500 text-slate-400"><LucideIcon name="user-plus" className="w-3.5 h-3.5" /></button>
-                                        </div>
-                                    </div>
-                                    <h1 className="text-4xl font-black mb-4 text-[#2B3A4A] tracking-tight count-up">฿{formatMoney(countUpTotal)}</h1>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {(activeGroup.members||[]).map(m => (
-                                            <div key={m} className="bg-white/80 px-2.5 py-1 rounded-xl border border-white flex items-center gap-1.5 shadow-sm text-[11px] font-bold">
-                                                <div style={{backgroundColor: getMemberData(activeGroup, m).color}} className="w-2 h-2 rounded-full"></div>
-                                                {m}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Settlements — สำคัญสุด */}
-                            <div className="glass-card p-5 section-mint">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2">
-                                        <span className="text-2xl">💸</span> เคลียร์เงิน
-                                    </h3>
-                                    <div className="flex gap-1.5">
-                                        <button onClick={exportImage} title="Export Image" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-pink-400"><LucideIcon name="image" className="w-4 h-4" /></button>
-                                        <button onClick={copyDashboardLink} title="Dashboard Link" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-emerald-500"><LucideIcon name="link" className="w-4 h-4" /></button>
-                                        <button onClick={exportExcel} title="Excel" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-blue-500"><LucideIcon name="file-spreadsheet" className="w-4 h-4" /></button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    {settlements.map((s, idx) => {
-                                        const key = settlementKey(s);
-                                        const isPaid = paidSettlements.has(key);
-                                        return (
-                                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border border-white shadow-sm transition-all ${isPaid ? 'settlement-paid bg-white/50' : 'bg-white/90'}`}>
-                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                <Avatar name={s.from} group={activeGroup} size="xs" />
-                                                <span className={`font-bold text-xs settlement-text`}>{s.from}</span>
-                                                <div className="bg-[#E0F7FA] text-[#55ABC8] px-1.5 py-0.5 rounded-full text-[9px] font-bold shrink-0">➔</div>
-                                                <Avatar name={s.to} group={activeGroup} size="xs" />
-                                                <span className={`font-bold text-xs settlement-text`}>{s.to}</span>
-                                                {isPaid && <span className="paid-badge shrink-0">โอนแล้ว</span>}
-                                            </div>
-                                            <div className="flex items-center gap-2 pl-2 shrink-0">
-                                                <div className="text-right">
-                                                    <p className="text-[9px] text-slate-400">ต้องโอน</p>
-                                                    <p className={`text-sm font-black ${isPaid ? 'text-slate-300 line-through' : 'text-[#89CFF0]'}`}>฿{formatMoney(s.amount)}</p>
-                                                </div>
-                                                <button onClick={() => togglePaid(s)}
-                                                    className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm text-sm
-                                                        ${isPaid ? 'bg-emerald-100 text-emerald-500 hover:bg-red-50 hover:text-red-400' : 'bg-white text-slate-300 hover:bg-emerald-50 hover:text-emerald-500 border border-slate-100'}`}
-                                                    title={isPaid ? 'ยกเลิก' : 'โอนแล้ว'}>
-                                                    {isPaid ? '✓' : '○'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        );
-                                    })}
-                                    {settlements.length === 0 && <p className="text-center opacity-40 text-xs py-6">ไม่มีการโอนค้างชำระ ✨</p>}
-                                </div>
-                            </div>
-
-                            {/* Individual Shares */}
+                            {/* 5. สรุปค่าใช้จ่ายแต่ละคน */}
                             <div className="glass-card p-4 section-blue">
                                 <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2 mb-4">
                                     <span className="text-2xl">📊</span> สรุปค่าใช้จ่ายแต่ละคน
@@ -1479,6 +1455,7 @@
                                     ))}
                                 </div>
                             </div>
+
                         </div>
                     )}
                     </main>
