@@ -334,6 +334,86 @@
 
         // ─── Persistent Login via localStorage ─────────────────────────────────────
         const REMEMBER_KEY = 'expense_pro_remember_login';
+        const LOCAL_MODE_KEY = 'ep_local_mode';
+        const LOCAL_DB_KEY = 'ep_local_db';
+        const LOCAL_USER_KEY = 'ep_local_user';
+
+        // ─── LocalDB: localStorage-backed data engine ──────────────────────────────
+        // Stores: { groups: {[id]: groupDoc}, expenses: {[groupId]: {[expId]: expDoc}} }
+        const LocalDB = {
+            _read() {
+                try { return JSON.parse(localStorage.getItem(LOCAL_DB_KEY) || '{"groups":{},"expenses":{}}'); }
+                catch { return { groups: {}, expenses: {} }; }
+            },
+            _write(data) { localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(data)); },
+            _listeners: {},  // key → [callback]
+            _notify(key) {
+                (this._listeners[key] || []).forEach(cb => cb());
+            },
+            _genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36); },
+
+            // Groups CRUD
+            getGroups() { return Object.values(this._read().groups); },
+            getGroup(id) { return this._read().groups[id] || null; },
+            saveGroup(id, data) {
+                const db = this._read();
+                db.groups[id] = { ...db.groups[id], ...data, id };
+                this._write(db);
+                this._notify('groups');
+                this._notify(`group:${id}`);
+            },
+            deleteGroup(id) {
+                const db = this._read();
+                delete db.groups[id];
+                delete db.expenses[id];
+                this._write(db);
+                this._notify('groups');
+            },
+            addGroup(data) {
+                const id = this._genId();
+                this.saveGroup(id, data);
+                return id;
+            },
+
+            // Expenses CRUD
+            getExpenses(groupId) { return Object.values(this._read().expenses[groupId] || {}); },
+            saveExpense(groupId, expId, data) {
+                const db = this._read();
+                if (!db.expenses[groupId]) db.expenses[groupId] = {};
+                db.expenses[groupId][expId] = { ...db.expenses[groupId][expId], ...data, id: expId };
+                this._write(db);
+                this._notify(`expenses:${groupId}`);
+            },
+            addExpense(groupId, data) {
+                const id = this._genId();
+                this.saveExpense(groupId, id, data);
+                return id;
+            },
+            deleteExpense(groupId, expId) {
+                const db = this._read();
+                if (db.expenses[groupId]) delete db.expenses[groupId][expId];
+                this._write(db);
+                this._notify(`expenses:${groupId}`);
+            },
+
+            // Listener (simulate onSnapshot)
+            subscribe(key, cb) {
+                if (!this._listeners[key]) this._listeners[key] = [];
+                this._listeners[key].push(cb);
+                return () => { this._listeners[key] = this._listeners[key].filter(f => f !== cb); };
+            },
+
+            // Local user
+            getLocalUser() {
+                try { return JSON.parse(localStorage.getItem(LOCAL_USER_KEY) || 'null'); }
+                catch { return null; }
+            },
+            setLocalUser(name) {
+                const u = { uid: 'local_' + Math.random().toString(36).slice(2), displayName: name, isLocal: true, photoURL: null };
+                localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
+                return u;
+            },
+        };
 
         const handlePermissionError = (e, ctx) => {
             console.error(`${ctx}:`, e);
@@ -444,6 +524,9 @@
             const [loading, setLoading] = useState(true);
             const [exporting, setExporting] = useState(false);
             const [dashError, setDashError] = useState('');
+            const [isLocalMode, setIsLocalMode] = useState(() => localStorage.getItem(LOCAL_MODE_KEY) === '1');
+            const [showModeSelect, setShowModeSelect] = useState(false);
+            const [localNameInput, setLocalNameInput] = useState('');
             const [darkMode, setDarkMode] = useState(() => localStorage.getItem('ep_dark') === '1');
             // paidSettlements: Set of "from→to" keys that user marked as paid
             const [paidSettlements, setPaidSettlements] = useState(() => {
@@ -506,11 +589,23 @@
 
             // ── Auth (with remember login) ────────────────────────────────────────
             useEffect(() => {
+                // LOCAL MODE — ใช้ข้อมูลจาก localStorage แทน Firebase
+                if (isLocalMode) {
+                    const localUser = LocalDB.getLocalUser();
+                    if (localUser) {
+                        setUser(localUser);
+                        setLoading(false);
+                    } else {
+                        // ยังไม่มีชื่อ → แสดง mode select screen
+                        setShowModeSelect(true);
+                        setLoading(false);
+                    }
+                    return;
+                }
+
                 let isMounted = true;
                 const init = async () => {
-                    // Check if user was previously logged in
                     const remembered = localStorage.getItem(REMEMBER_KEY);
-                    
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             try { await auth.signInWithCustomToken(__initial_auth_token); }
@@ -518,25 +613,18 @@
                         } else if (!remembered) {
                             await auth.signInAnonymously();
                         }
-                        // If remembered, Firebase will auto-restore session via persistence
                     } catch (err) { console.error("Auth Error:", err); }
                 };
-                
-                // Set Firebase auth persistence to LOCAL so login is remembered
                 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(init).catch(init);
-                
                 const unsub = auth.onAuthStateChanged(u => {
                     if (isMounted) {
                         setUser(u);
                         setLoading(false);
-                        // Save remember flag if logged in with Google
-                        if (u && !u.isAnonymous) {
-                            localStorage.setItem(REMEMBER_KEY, '1');
-                        }
+                        if (u && !u.isAnonymous) localStorage.setItem(REMEMBER_KEY, '1');
                     }
                 });
                 return () => { isMounted = false; unsub(); };
-            }, []);
+            }, [isLocalMode]);
 
             // ── Load Dashboard ─────────────────────────────────────────────────────
             useEffect(() => {
@@ -588,10 +676,27 @@
                 process();
             }, [user]);
 
-            // ── Load Groups ────────────────────────────────────────────────────────
+            // ── Load Groups ────────────────────────────────────────────────────
             useEffect(() => {
                 const params = new URLSearchParams(window.location.search);
-                if (!user || user.isAnonymous || params.get('dashboard')) return;
+                if (!user || params.get('dashboard')) return;
+
+                if (isLocalMode) {
+                    // LOCAL: อ่านจาก localStorage ทันที และ subscribe การเปลี่ยนแปลง
+                    const refresh = () => {
+                        const all = LocalDB.getGroups().sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+                        setGroups(all);
+                        if (activeGroup && view === 'detail') {
+                            const upd = all.find(g => g.id === activeGroup.id);
+                            if (upd) setActiveGroup(upd);
+                        }
+                    };
+                    refresh();
+                    const unsub = LocalDB.subscribe('groups', refresh);
+                    return unsub;
+                }
+
+                // CLOUD: Firestore onSnapshot
                 const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                 const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
                 const unsub = ref.onSnapshot(snap => {
@@ -599,7 +704,6 @@
                     const mine = data.filter(g =>
                         g.ownerId === user.uid ||
                         (g.members||[]).includes(myName) ||
-                        // รวมกลุ่มที่ user claim เป็นสมาชิกคนเดิม (ชื่อ Google ไม่ match แต่ claim ไว้)
                         (g.memberClaims && g.memberClaims[user.uid])
                     ).sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
                     setGroups(mine);
@@ -609,17 +713,27 @@
                     }
                 }, err => { if (!err.message?.includes('permission')) handlePermissionError(err, "ดึงรายชื่อกลุ่มไม่สำเร็จ"); });
                 return () => unsub();
-            }, [user, activeGroup?.id, view]);
+            }, [user, activeGroup?.id, view, isLocalMode]);
 
             // ── Load Expenses ──────────────────────────────────────────────────────
             useEffect(() => {
                 if (!user || !activeGroup) return;
+
+                if (isLocalMode) {
+                    const refresh = () => {
+                        setExpenses(LocalDB.getExpenses(activeGroup.id).sort((a,b) => b.date - a.date));
+                    };
+                    refresh();
+                    const unsub = LocalDB.subscribe(`expenses:${activeGroup.id}`, refresh);
+                    return unsub;
+                }
+
                 const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
                 const unsub = ref.onSnapshot(snap => {
                     setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.date - a.date));
                 }, err => { if (!err.message?.includes('permission')) handlePermissionError(err, "ดึงรายการบิลไม่สำเร็จ"); });
                 return () => unsub();
-            }, [user, activeGroup?.id]);
+            }, [user, activeGroup?.id, isLocalMode]);
 
             // ── Helpers ────────────────────────────────────────────────────────────
             const getGroupStyle = (g) => {
@@ -672,18 +786,69 @@
                 await auth.signOut();
             };
 
-            const createGroup = async () => {
-                if (!newGroupName.trim() || !user || user.isAnonymous) return;
-                const myName = user.displayName?.split(' ')[0] || 'ฉัน';
+            // ── Upgrade Local → Cloud (migrate ข้อมูลไป Firestore) ─────────────────
+            const upgradeToCloud = async () => {
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').add({
-                        name: newGroupName.trim(),
-                        iconEmoji: newGroupEmoji,
-                        iconColor: newGroupColor,
-                        ownerId: user.uid, ownerName: myName,
-                        members: [myName], memberIcons: {},
-                        createdAt: Date.now()
-                    });
+                    showToast('กำลัง login Google...', 'info', 1500);
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    const result = await auth.signInWithPopup(provider);
+                    const cloudUser = result.user;
+                    if (!cloudUser) return;
+
+                    const localGroups = LocalDB.getGroups();
+                    if (localGroups.length === 0) {
+                        // ไม่มีข้อมูล local → แค่ switch mode
+                        localStorage.removeItem(LOCAL_MODE_KEY);
+                        localStorage.removeItem(LOCAL_USER_KEY);
+                        setIsLocalMode(false);
+                        localStorage.setItem(REMEMBER_KEY, '1');
+                        showToast('เชื่อมต่อ Cloud แล้ว ☁️', 'success');
+                        return;
+                    }
+
+                    showToast(`กำลัง migrate ${localGroups.length} กลุ่ม...`, 'info', 3000);
+                    const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups');
+                    const myCloudName = cloudUser.displayName?.split(' ')[0] || 'ฉัน';
+
+                    for (const g of localGroups) {
+                        // Upload group
+                        const { id: localId, ...gData } = g;
+                        const newGroupRef = await groupRef.add({
+                            ...gData,
+                            ownerId: cloudUser.uid,
+                            ownerName: myCloudName,
+                            migratedFrom: 'local',
+                            createdAt: g.createdAt || Date.now(),
+                        });
+                        // Upload expenses
+                        const exps = LocalDB.getExpenses(localId);
+                        for (const exp of exps) {
+                            const { id: expId, ...expData } = exp;
+                            await newGroupRef.collection('expenses').add(expData);
+                        }
+                    }
+
+                    // Switch to cloud mode
+                    localStorage.removeItem(LOCAL_MODE_KEY);
+                    localStorage.removeItem(LOCAL_USER_KEY);
+                    setIsLocalMode(false);
+                    setUser(cloudUser);
+                    localStorage.setItem(REMEMBER_KEY, '1');
+                    showToast(`Migrate สำเร็จ! ${localGroups.length} กลุ่มอยู่บน Cloud แล้ว ☁️✨`, 'success', 4000);
+                } catch (e) {
+                    console.error(e);
+                    showToast('Upgrade ไม่สำเร็จ: ' + e.message, 'error', 4000);
+                }
+            };
+
+            const createGroup = async () => {
+                if (!newGroupName.trim() || !user) return;
+                const myName = user.displayName?.split(' ')[0] || 'ฉัน';
+                const data = { name: newGroupName.trim(), iconEmoji: newGroupEmoji, iconColor: newGroupColor,
+                    ownerId: user.uid, ownerName: myName, members: [myName], memberIcons: {}, createdAt: Date.now() };
+                try {
+                    if (isLocalMode) { LocalDB.addGroup(data); }
+                    else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').add(data); }
                     setNewGroupName(''); setNewGroupEmoji('✈️'); setNewGroupColor('#FFD1DC');
                     setShowAddGroup(false);
                     showToast('สร้างทริปแล้ว 🏕️', 'success');
@@ -691,17 +856,18 @@
             };
 
             const updateGroupIcon = async () => {
-                if (!activeGroup || !user || user.isAnonymous) return;
+                if (!activeGroup || !user) return;
+                const upd = { iconEmoji: editGroupEmoji, iconColor: editGroupColor, name: editGroupName };
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
-                        iconEmoji: editGroupEmoji, iconColor: editGroupColor, name: editGroupName
-                    });
+                    if (isLocalMode) { LocalDB.saveGroup(activeGroup.id, upd); setActiveGroup(g => ({...g, ...upd})); }
+                    else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update(upd); }
                     setShowGroupIconPicker(false);
                 } catch (e) { handlePermissionError(e, "อัปเดตไอคอนไม่สำเร็จ"); }
             };
 
             const joinGroup = async () => {
-                if (!joinId.trim() || !user || user.isAnonymous) return;
+                if (!joinId.trim() || !user) return;
+                if (isLocalMode) { showToast("Local mode ไม่รองรับการ join กลุ่มจากภายนอก", "warning"); return; }
                 try {
                     const myName = user.displayName?.split(' ')[0] || 'ฉัน';
                     const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(joinId.trim());
@@ -709,17 +875,8 @@
                     if (!doc.exists) { showToast("ไม่พบกลุ่มนี้ ❌", "error"); return; }
                     const data = doc.data();
                     setJoinId(''); setShowJoinGroup(false);
-                    // ถ้าชื่อตรงอยู่แล้ว → เข้าตรงเลย
-                    if ((data.members||[]).includes(myName)) {
-                        setActiveGroup({ id: doc.id, ...data });
-                        setView('detail');
-                    } else {
-                        // แสดง modal ให้เลือกสมาชิก
-                        setClaimGroupData({ ref, groupDoc: { id: doc.id, ...data } });
-                        setClaimSelectedMember(null);
-                        setClaimNewName(myName);
-                        setShowClaimMember(true);
-                    }
+                    if ((data.members||[]).includes(myName)) { setActiveGroup({ id: doc.id, ...data }); setView('detail'); }
+                    else { setClaimGroupData({ ref, groupDoc: { id: doc.id, ...data } }); setClaimSelectedMember(null); setClaimNewName(myName); setShowClaimMember(true); }
                 } catch (e) { handlePermissionError(e, "เข้าร่วมไม่สำเร็จ"); }
             };
 
@@ -762,60 +919,60 @@
 
             const deleteGroup = async (id, e) => {
                 e.stopPropagation();
-                if (!user || user.isAnonymous) return;
-                // หาข้อมูลกลุ่มเพื่อเช็ค ownerId
+                if (!user) return;
                 const group = groups.find(g => g.id === id);
-                if (group && group.ownerId !== user.uid) {
-                    showToast("เฉพาะผู้สร้างเท่านั้นที่ลบได้ 🔒", "warning");
-                    return;
-                }
+                if (group && group.ownerId !== user.uid) { showToast("เฉพาะผู้สร้างเท่านั้นที่ลบได้ 🔒", "warning"); return; }
                 if (confirm("ต้องการลบกลุ่มและข้อมูลทั้งหมดถาวรหรือไม่?")) {
-                    try { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete(); }
-                    catch (e) { handlePermissionError(e, "ลบกลุ่มไม่สำเร็จ"); }
+                    try {
+                        if (isLocalMode) { LocalDB.deleteGroup(id); if (activeGroup?.id === id) { setActiveGroup(null); setView('list'); } }
+                        else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete(); }
+                    } catch (e) { handlePermissionError(e, "ลบกลุ่มไม่สำเร็จ"); }
                 }
             };
 
             const leaveGroup = async (id, e) => {
                 e.stopPropagation();
-                if (!user || user.isAnonymous) return;
+                if (!user) return;
                 const group = groups.find(g => g.id === id);
                 if (!group) return;
                 if (!confirm(`ออกจากกลุ่ม "${group.name}" ใช่หรือไม่?`)) return;
                 try {
-                    const myName = user.displayName?.split(' ')[0] || 'ฉัน';
-                    const claimedName = group.memberClaims?.[user.uid];
-                    const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id);
-                    const updates = {
-                        [`memberClaims.${user.uid}`]: firebase.firestore.FieldValue.delete()
-                    };
-                    // ถ้ามีชื่อใน members ให้ลบออกด้วย
-                    if (claimedName) {
-                        updates.members = firebase.firestore.FieldValue.arrayRemove(claimedName);
-                    } else if ((group.members||[]).includes(myName)) {
-                        updates.members = firebase.firestore.FieldValue.arrayRemove(myName);
+                    if (isLocalMode) {
+                        // Local mode: ลบออกจาก members
+                        const myName = user.displayName?.split(' ')[0] || 'ฉัน';
+                        const newMembers = (group.members||[]).filter(m => m !== myName);
+                        LocalDB.saveGroup(id, { ...group, members: newMembers });
+                        if (activeGroup?.id === id) { setActiveGroup(null); setView('list'); }
+                    } else {
+                        const myName = user.displayName?.split(' ')[0] || 'ฉัน';
+                        const claimedName = group.memberClaims?.[user.uid];
+                        const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id);
+                        const updates = { [`memberClaims.${user.uid}`]: firebase.firestore.FieldValue.delete() };
+                        if (claimedName) updates.members = firebase.firestore.FieldValue.arrayRemove(claimedName);
+                        else if ((group.members||[]).includes(myName)) updates.members = firebase.firestore.FieldValue.arrayRemove(myName);
+                        await ref.update(updates);
                     }
-                    await ref.update(updates);
                     showToast('ออกจากกลุ่มแล้ว 👋', 'info');
                 } catch (e) { handlePermissionError(e, "ออกจากกลุ่มไม่สำเร็จ"); }
             };
 
             const addMember = async () => {
-                if (!user || user.isAnonymous || !activeGroup || !newMemberName.trim() || (activeGroup.members||[]).includes(newMemberName.trim())) return;
+                if (!user || !activeGroup || !newMemberName.trim() || (activeGroup.members||[]).includes(newMemberName.trim())) return;
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
-                        members: firebase.firestore.FieldValue.arrayUnion(newMemberName.trim())
-                    });
+                    const newMembers = [...(activeGroup.members||[]), newMemberName.trim()];
+                    if (isLocalMode) { LocalDB.saveGroup(activeGroup.id, { members: newMembers }); setActiveGroup(g => ({...g, members: newMembers})); }
+                    else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: firebase.firestore.FieldValue.arrayUnion(newMemberName.trim()) }); }
                     setNewMemberName('');
                 } catch (e) { handlePermissionError(e, "เพิ่มสมาชิกไม่สำเร็จ"); }
             };
 
             const removeMember = async (name) => {
-                if (!user || user.isAnonymous || !activeGroup) return;
+                if (!user || !activeGroup) return;
                 if (confirm(`ลบ ${name} ออกจากกลุ่ม?`)) {
                     try {
-                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({
-                            members: firebase.firestore.FieldValue.arrayRemove(name)
-                        });
+                        const newMembers = (activeGroup.members||[]).filter(m => m !== name);
+                        if (isLocalMode) { LocalDB.saveGroup(activeGroup.id, { members: newMembers }); setActiveGroup(g => ({...g, members: newMembers})); }
+                        else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: firebase.firestore.FieldValue.arrayRemove(name) }); }
                     } catch (e) { handlePermissionError(e, "ลบสมาชิกไม่สำเร็จ"); }
                 }
             };
@@ -832,77 +989,80 @@
             };
 
             const saveMemberEdit = async () => {
-                if (!activeGroup || !user || user.isAnonymous || !editingMemberData) return;
+                if (!activeGroup || !user || !editingMemberData) return;
                 const { oldName } = editingMemberData;
                 const newName = memberNewName.trim();
                 if (!newName) return;
-
-                const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id);
-                const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
-
                 try {
-                    // Build updated members array
                     const newMembers = (activeGroup.members||[]).map(m => m === oldName ? newName : m);
-                    
-                    // Update member icons
                     const memberIcons = { ...(activeGroup.memberIcons||{}) };
-                    if (oldName !== newName) {
-                        if (memberIcons[oldName]) { memberIcons[newName] = memberIcons[oldName]; delete memberIcons[oldName]; }
-                    }
+                    if (oldName !== newName && memberIcons[oldName]) { memberIcons[newName] = memberIcons[oldName]; delete memberIcons[oldName]; }
                     memberIcons[newName] = { emoji: memberNewEmoji || null, color: memberNewColor, shape: memberNewShape };
 
-                    await groupRef.update({ members: newMembers, memberIcons });
-
-                    // If renamed, update all expenses
-                    if (oldName !== newName) {
-                        const snap = await expRef.get();
-                        const batch = db.batch();
-                        snap.docs.forEach(doc => {
-                            const d = doc.data();
-                            let changed = false;
-                            const update = {};
-                            if (d.payer === oldName) { update.payer = newName; changed = true; }
-                            if ((d.participants||[]).includes(oldName)) {
-                                update.participants = d.participants.map(p => p === oldName ? newName : p);
-                                changed = true;
-                            }
-                            if (changed) batch.update(doc.ref, update);
+                    if (isLocalMode) {
+                        // Rename in expenses too
+                        LocalDB.getExpenses(activeGroup.id).forEach(exp => {
+                            let changed = false; const upd = { ...exp };
+                            if (exp.payer === oldName) { upd.payer = newName; changed = true; }
+                            if ((exp.participants||[]).includes(oldName)) { upd.participants = exp.participants.map(p => p === oldName ? newName : p); changed = true; }
+                            if (changed) LocalDB.saveExpense(activeGroup.id, exp.id, upd);
                         });
-                        await batch.commit();
+                        LocalDB.saveGroup(activeGroup.id, { members: newMembers, memberIcons });
+                        setActiveGroup(g => ({ ...g, members: newMembers, memberIcons }));
+                    } else {
+                        const groupRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id);
+                        const expRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
+                        await groupRef.update({ members: newMembers, memberIcons });
+                        if (oldName !== newName) {
+                            const snap = await expRef.get();
+                            const batch = db.batch();
+                            snap.docs.forEach(doc => {
+                                const d = doc.data(); let changed = false; const update = {};
+                                if (d.payer === oldName) { update.payer = newName; changed = true; }
+                                if ((d.participants||[]).includes(oldName)) { update.participants = d.participants.map(p => p === oldName ? newName : p); changed = true; }
+                                if (changed) batch.update(doc.ref, update);
+                            });
+                            await batch.commit();
+                        }
                     }
-                    setShowMemberEditor(false);
-                    setEditingMemberData(null);
+                    setShowMemberEditor(false); setEditingMemberData(null);
                     showToast('บันทึกข้อมูลสมาชิกแล้ว ✨', 'success');
                 } catch (e) { handlePermissionError(e, "แก้ไขสมาชิกไม่สำเร็จ"); }
             };
 
             const saveExpense = async () => {
-                if (!user || user.isAnonymous || !activeGroup) return;
+                if (!user || !activeGroup) return;
                 const amount = evaluateMath(expAmount);
                 if (!expDesc || amount <= 0 || !expPayer) return;
                 const data = { description: expDesc, amount, payer: expPayer, participants: expParticipants, date: editingExpense ? editingExpense.date : Date.now() };
                 try {
-                    const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
-                    if (editingExpense) await ref.doc(editingExpense.id).update(data);
-                    else await ref.add(data);
+                    if (isLocalMode) {
+                        if (editingExpense) LocalDB.saveExpense(activeGroup.id, editingExpense.id, data);
+                        else LocalDB.addExpense(activeGroup.id, data);
+                    } else {
+                        const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses');
+                        if (editingExpense) await ref.doc(editingExpense.id).update(data);
+                        else await ref.add(data);
+                    }
                     showToast(editingExpense ? 'แก้ไขบิลแล้ว ✏️' : 'เพิ่มบิลแล้ว 🧾', 'success');
                     setShowExpenseModal(false); setEditingExpense(null);
                 } catch (e) { handlePermissionError(e, "บันทึกบิลไม่สำเร็จ"); }
             };
 
             const deleteExpense = async (id) => {
-                if (!user || user.isAnonymous || !activeGroup) return;
+                if (!user || !activeGroup) return;
                 if (confirm("ลบรายการนี้ใช่หรือไม่?")) {
                     try {
-                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete();
+                        if (isLocalMode) { LocalDB.deleteExpense(activeGroup.id, id); }
+                        else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).collection('expenses').doc(id).delete(); }
                         showToast('ลบบิลแล้ว 🗑️', 'info');
-                    }
-                    catch (e) { handlePermissionError(e, "ลบบิลไม่สำเร็จ"); }
+                    } catch (e) { handlePermissionError(e, "ลบบิลไม่สำเร็จ"); }
                 }
             };
 
             const shareLink = () => {
                 if (!activeGroup) return;
+                if (isLocalMode) { upgradeToCloud(); return; }
                 const base = window.location.href.split('?')[0];
                 const url = `${base}?join=${activeGroup.id}`;
                 navigator.clipboard?.writeText(url) || fallbackCopy(url);
@@ -1069,22 +1229,68 @@
                 </div>
             );
 
-            // ── Login Screen ───────────────────────────────────────────────────────
+            // ── Mode Select / Login Screen ─────────────────────────────────────────
             if (!user || (user.isAnonymous && !dashIdFromUrl && view !== 'dashboard')) {
-                return (
-                    <div className="h-screen flex items-center justify-center p-4 animate-pop">
-                        <div className="glass-card p-8 text-center max-w-xs w-full shadow-2xl">
-                            <div className="w-20 h-20 bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] rounded-[24px] flex items-center justify-center mx-auto mb-5 shadow-lg text-5xl border-4 border-white">🧸</div>
-                            <h1 className="text-2xl font-bold mb-1 text-[#2B3A4A]">Expense Pro</h1>
-                            <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">แอปจัดการบิลกลุ่มและทริปเพื่อน<br/>เข้าสู่ระบบเพื่อดูทริปของคุณ ✨</p>
-                            <button onClick={handleLogin} className="btn-primary w-full py-3 px-5 flex items-center justify-center gap-2 font-bold shadow-lg text-sm">
-                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" />
-                                เข้าสู่ระบบด้วย Google
-                            </button>
-                            <p className="text-[10px] text-slate-400 mt-3">ระบบจะจดจำการเข้าสู่ระบบของคุณอัตโนมัติ 🔑</p>
+                // ถ้ายังไม่ได้เลือก mode → แสดงหน้าเลือก
+                if (showModeSelect || (!isLocalMode && (!user || user.isAnonymous))) {
+                    return (
+                        <div className="h-screen flex items-center justify-center p-4 animate-pop">
+                            <div className="glass-card p-8 text-center max-w-xs w-full shadow-2xl">
+                                <div className="w-20 h-20 bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] rounded-[24px] flex items-center justify-center mx-auto mb-5 shadow-lg text-5xl border-4 border-white">🧸</div>
+                                <h1 className="text-2xl font-bold mb-1 text-[#2B3A4A]">Expense Pro</h1>
+                                <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">แอปจัดการบิลกลุ่มและทริปเพื่อน<br/>เลือกวิธีการใช้งาน ✨</p>
+
+                                {/* LOCAL MODE */}
+                                <div className="mb-3">
+                                    {localNameInput !== null && (
+                                        <div className="mb-3 text-left">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">ชื่อของคุณ</p>
+                                            <input
+                                                value={localNameInput}
+                                                onChange={e => setLocalNameInput(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && localNameInput.trim()) {
+                                                        const u = LocalDB.setLocalUser(localNameInput.trim());
+                                                        localStorage.setItem(LOCAL_MODE_KEY, '1');
+                                                        setIsLocalMode(true); setUser(u); setShowModeSelect(false);
+                                                        showToast(`ยินดีต้อนรับ ${localNameInput.trim()} 👋`, 'success');
+                                                    }
+                                                }}
+                                                placeholder="เช่น มิว, ต้น, แบม..."
+                                                className="w-full bg-white/70 rounded-xl px-3 py-2.5 text-sm font-medium outline-none border border-slate-100 focus:ring-2 ring-[#FFD1DC] mb-2"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            if (!localNameInput.trim()) { setLocalNameInput(''); return; }
+                                            const u = LocalDB.setLocalUser(localNameInput.trim());
+                                            localStorage.setItem(LOCAL_MODE_KEY, '1');
+                                            setIsLocalMode(true); setUser(u); setShowModeSelect(false);
+                                            showToast(`ยินดีต้อนรับ ${localNameInput.trim()} 👋`, 'success');
+                                        }}
+                                        className="btn-secondary w-full py-3 px-5 flex items-center justify-center gap-2 font-bold shadow-md text-sm">
+                                        <span className="text-lg">📱</span> ใช้แบบ Local (ไม่ต้อง Login)
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 mt-1.5 text-left leading-relaxed">เก็บข้อมูลในเครื่องนี้เท่านั้น ไม่ sync ข้ามอุปกรณ์</p>
+                                </div>
+
+                                <div className="flex items-center gap-2 my-3">
+                                    <div className="flex-1 h-px bg-slate-200"></div>
+                                    <span className="text-[10px] text-slate-400 font-bold">หรือ</span>
+                                    <div className="flex-1 h-px bg-slate-200"></div>
+                                </div>
+
+                                <button onClick={handleLogin} className="btn-primary w-full py-3 px-5 flex items-center justify-center gap-2 font-bold shadow-lg text-sm">
+                                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" />
+                                    Login ด้วย Google (Cloud Sync)
+                                </button>
+                                <p className="text-[10px] text-slate-400 mt-1.5 text-left leading-relaxed">Sync ข้ามอุปกรณ์ และ share กับเพื่อนได้</p>
+                            </div>
                         </div>
-                    </div>
-                );
+                    );
+                }
             }
 
             // ── Main Render ────────────────────────────────────────────────────────
@@ -1114,16 +1320,48 @@
                                     <button onClick={handleLogin} className="text-xs font-bold bg-white px-3 py-1.5 rounded-xl shadow-sm">เข้าสู่ระบบ</button>
                                 ) : (
                                     <div className="relative group flex items-center gap-2">
-                                        <div className="hidden sm:block text-right">
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase">โปรไฟล์</p>
-                                            <p className="text-xs font-bold">{user.displayName?.split(' ')[0]}</p>
-                                        </div>
-                                        <div className="relative">
-                                            <img src={user.photoURL || ''} className="w-9 h-9 rounded-[16px] border-2 border-white shadow-md object-cover" />
-                                            <button onClick={handleLogout} className="absolute -top-1 -right-1 bg-white p-1 rounded-full shadow-sm border border-[#FFD1DC] text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <LucideIcon name="log-out" className="w-2.5 h-2.5" />
-                                            </button>
-                                        </div>
+                                        {isLocalMode ? (
+                                            // LOCAL MODE header
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={upgradeToCloud}
+                                                    className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold bg-gradient-to-r from-blue-400 to-indigo-400 text-white px-2.5 py-1.5 rounded-xl shadow-sm hover:shadow-md transition-all">
+                                                    <span>☁️</span> Upgrade
+                                                </button>
+                                                <div className="text-right hidden sm:block">
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase">Local Mode</p>
+                                                    <p className="text-xs font-bold">{user.displayName?.split(' ')[0]}</p>
+                                                </div>
+                                                <div className="relative">
+                                                    <div className="w-9 h-9 rounded-[16px] bg-gradient-to-br from-[#89CFF0] to-[#B0E0E6] flex items-center justify-center text-white font-black text-sm border-2 border-white shadow-md">
+                                                        {(user.displayName||'?')[0].toUpperCase()}
+                                                    </div>
+                                                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-400 rounded-full border-2 border-white" title="Local Mode"></div>
+                                                    <button onClick={() => {
+                                                        if (confirm('ออกจาก Local Mode และกลับหน้าเลือก mode?')) {
+                                                            localStorage.removeItem(LOCAL_MODE_KEY);
+                                                            localStorage.removeItem(LOCAL_USER_KEY);
+                                                            setIsLocalMode(false); setUser(null); setGroups([]); setShowModeSelect(true);
+                                                        }
+                                                    }} className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <LucideIcon name="log-out" className="w-2 h-2" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            // CLOUD MODE header
+                                            <>
+                                            <div className="hidden sm:block text-right">
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">โปรไฟล์</p>
+                                                <p className="text-xs font-bold">{user.displayName?.split(' ')[0]}</p>
+                                            </div>
+                                            <div className="relative">
+                                                <img src={user.photoURL || ''} className="w-9 h-9 rounded-[16px] border-2 border-white shadow-md object-cover" />
+                                                <button onClick={handleLogout} className="absolute -top-1 -right-1 bg-white p-1 rounded-full shadow-sm border border-[#FFD1DC] text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <LucideIcon name="log-out" className="w-2.5 h-2.5" />
+                                                </button>
+                                            </div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1135,14 +1373,29 @@
                     {/* ─── LIST VIEW ─────────────────────────────────────────────────── */}
                     {view === 'list' && (
                         <div className="space-y-4">
+                            {/* Upgrade banner — local mode only */}
+                            {isLocalMode && (
+                                <div className="glass-card p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 flex items-center gap-3">
+                                    <span className="text-2xl">☁️</span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-sm text-[#2B3A4A]">อยากแชร์กับเพื่อน?</p>
+                                        <p className="text-[10px] text-slate-500">Upgrade เป็น Cloud เพื่อ sync และส่งลิงก์เชิญได้</p>
+                                    </div>
+                                    <button onClick={upgradeToCloud} className="btn-secondary px-3 py-2 text-xs font-bold shrink-0 flex items-center gap-1">
+                                        <span>↑</span> Upgrade
+                                    </button>
+                                </div>
+                            )}
                             <div className="flex gap-3">
                                 <button onClick={() => setShowAddGroup(true)} className="btn-primary flex-1 py-6 shadow-md flex flex-col items-center justify-center gap-2 text-sm font-bold">
                                     <div className="bg-white/40 p-2 rounded-xl"><LucideIcon name="plus-circle" className="w-6 h-6" /></div>
                                     สร้างทริปใหม่
                                 </button>
-                                <button onClick={() => setShowJoinGroup(true)} className="btn-secondary flex-1 py-6 shadow-md flex flex-col items-center justify-center gap-2 text-sm font-bold">
+                                <button
+                                    onClick={isLocalMode ? upgradeToCloud : () => setShowJoinGroup(true)}
+                                    className={`btn-secondary flex-1 py-6 shadow-md flex flex-col items-center justify-center gap-2 text-sm font-bold ${isLocalMode ? 'opacity-70' : ''}`}>
                                     <div className="bg-white/40 p-2 rounded-xl"><LucideIcon name="users" className="w-6 h-6" /></div>
-                                    เข้าทริปเพื่อน
+                                    {isLocalMode ? 'เข้าทริปเพื่อน ☁️' : 'เข้าทริปเพื่อน'}
                                 </button>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
