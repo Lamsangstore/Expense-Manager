@@ -140,6 +140,122 @@
         .animate-pop { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.94) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
+        /* ═══════════════════════════════════════════════════════════
+           🎬 MEGA ANIMATION PACK — App Store Style
+           ═══════════════════════════════════════════════════════════ */
+
+        /* ── Floating Orbs Background ── */
+        @keyframes floatOrb1{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(80px,-60px) scale(1.1)}50%{transform:translate(-40px,-120px) scale(.9)}75%{transform:translate(-80px,-30px) scale(1.05)}}
+        @keyframes floatOrb2{0%,100%{transform:translate(0,0)}25%{transform:translate(-100px,40px) scale(1.15)}50%{transform:translate(60px,100px) scale(.85)}75%{transform:translate(30px,-50px) scale(1.1)}}
+        @keyframes floatOrb3{0%,100%{transform:translate(0,0)}33%{transform:translate(50px,80px) scale(1.2)}66%{transform:translate(-70px,-40px) scale(.9)}}
+        .float-orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0;will-change:transform}
+        .float-orb-1{width:350px;height:350px;background:rgba(255,182,193,0.35);top:-80px;right:-80px;animation:floatOrb1 22s ease-in-out infinite}
+        .float-orb-2{width:300px;height:300px;background:rgba(189,178,255,0.3);bottom:-50px;left:-80px;animation:floatOrb2 28s ease-in-out infinite}
+        .float-orb-3{width:280px;height:280px;background:rgba(176,224,230,0.3);top:45%;left:40%;animation:floatOrb3 20s ease-in-out infinite}
+        body.dark .float-orb{opacity:0.15}
+
+        /* ── Page Entrance ── */
+        @keyframes pageSlideUp{from{opacity:0;transform:translateY(30px) scale(.98)}to{opacity:1;transform:none}}
+        .page-enter{animation:pageSlideUp .7s cubic-bezier(.22,1,.36,1) both}
+
+        /* ── Stagger Fade Up ── */
+        @keyframes fadeSlideUp{from{opacity:0;transform:translateY(35px) scale(.96);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+        .anim-up{animation:fadeSlideUp .6s cubic-bezier(.22,1,.36,1) both}
+
+        /* ── Slide In Left / Right ── */
+        @keyframes slideInLeft{from{opacity:0;transform:translateX(-50px)}to{opacity:1;transform:none}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(50px)}to{opacity:1;transform:none}}
+        .anim-left{animation:slideInLeft .6s cubic-bezier(.22,1,.36,1) both}
+        .anim-right{animation:slideInRight .6s cubic-bezier(.22,1,.36,1) both}
+
+        /* ── Scale Pop ── */
+        @keyframes scalePop{0%{opacity:0;transform:scale(.4)}60%{transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
+        .anim-pop{animation:scalePop .5s cubic-bezier(.34,1.56,.64,1) both}
+
+        /* ── Bounce In ── */
+        @keyframes bounceIn{0%{opacity:0;transform:scale(.3)}50%{transform:scale(1.08)}70%{transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
+        .anim-bounce{animation:bounceIn .7s cubic-bezier(.34,1.56,.64,1) both}
+
+        /* ── Heartbeat ── */
+        @keyframes heartbeat{0%,100%{transform:scale(1)}15%{transform:scale(1.25)}30%{transform:scale(1)}45%{transform:scale(1.15)}}
+        .heartbeat{display:inline-block;animation:heartbeat 1.8s ease-in-out infinite}
+
+        /* ── Pulse Glow ── */
+        @keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(255,182,193,0.4)}50%{box-shadow:0 0 20px 8px rgba(255,182,193,0.15)}}
+        .pulse-glow{animation:pulseGlow 2.5s ease-in-out infinite}
+
+        /* ── Wiggle ── */
+        @keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-3deg)}75%{transform:rotate(3deg)}}
+
+        /* ── Shimmer Text ── */
+        @keyframes shimmerText{0%{background-position:-200% center}100%{background-position:200% center}}
+        .shimmer-title{background:linear-gradient(90deg,#2B3A4A 0%,#FF9EAE 25%,#89CFF0 50%,#BDB2FF 75%,#2B3A4A 100%);background-size:300% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmerText 5s linear infinite}
+        body.dark .shimmer-title{background:linear-gradient(90deg,#f1f5f9 0%,#ffb8c8 25%,#a8dfff 50%,#d4c8ff 75%,#f1f5f9 100%);background-size:300% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmerText 5s linear infinite}
+
+        /* ── Ripple Click ── */
+        .ripple-fx{position:absolute;border-radius:50%;background:rgba(255,182,193,0.3);transform:scale(0);animation:rippleFx .6s ease-out forwards;pointer-events:none}
+        @keyframes rippleFx{to{transform:scale(4);opacity:0}}
+
+        /* ── Sparkle ── */
+        @keyframes sparkleFx{0%{opacity:0;transform:scale(0) rotate(0)}50%{opacity:1;transform:scale(1) rotate(180deg)}100%{opacity:0;transform:scale(0) rotate(360deg)}}
+        .sparkle-dot{position:fixed;border-radius:50%;animation:sparkleFx .8s ease-out forwards;pointer-events:none;z-index:9999}
+
+        /* ── Confetti ── */
+        #confetti-fx{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+
+        /* ── Gradient Shift (for banners) ── */
+        @keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        .grad-shift{background-size:200% 200%;animation:gradShift 6s ease infinite}
+
+        /* ── Banner Shimmer Light ── */
+        @keyframes bannerShim{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+        .banner-shim::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);animation:bannerShim 3s ease-in-out infinite;pointer-events:none}
+
+        /* ── Glow Ring on Hover ── */
+        .glow-hover{position:relative;transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .35s}
+        .glow-hover:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 16px 50px -8px rgba(255,182,193,0.3) !important}
+        .glow-hover:active{transform:scale(.97);transition-duration:.1s}
+
+        /* ── Icon Bounce on Hover ── */
+        .icon-bounce:hover .avatar-icon{animation:bounceIn .5s cubic-bezier(.34,1.56,.64,1)}
+
+        /* ── Scroll Reveal ── */
+        .scroll-reveal{opacity:0;transform:translateY(40px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
+        .scroll-reveal.sr-visible{opacity:1;transform:none}
+
+        /* ── Button Hover Enhancements ── */
+        .btn-primary{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important}
+        .btn-primary:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 8px 25px rgba(255,182,193,0.4) !important}
+        .btn-secondary{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important}
+        .btn-secondary:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 8px 25px rgba(176,224,230,0.4) !important}
+
+        /* ── Glass Card Enhanced Hover ── */
+        .glass-card{transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .35s,border-color .35s !important}
+        .glass-card:hover{border-color:rgba(255,182,193,0.5) !important}
+
+        /* ── Input Focus Animation ── */
+        input:focus,textarea:focus{transition:all .3s cubic-bezier(.34,1.56,.64,1) !important;transform:scale(1.01)}
+
+        /* ── Emoji Hover ── */
+        .emoji-option{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important}
+        .emoji-option:hover{transform:scale(1.25) rotate(-8deg) !important}
+
+        /* ── Color Swatch Hover ── */
+        .color-swatch{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important}
+        .color-swatch:hover{transform:scale(1.3) !important}
+
+        /* ── Staggered List Items ── */
+        .stagger-item{animation:fadeSlideUp .5s cubic-bezier(.22,1,.36,1) both}
+
+        /* ── Slide Down Nav ── */
+        @keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:none;opacity:1}}
+
+        /* ── Number Pulse ── */
+        @keyframes numPulse{0%{transform:scale(1)}50%{transform:scale(1.15);color:#FF9EAE}100%{transform:scale(1)}}
+        .num-pulse{animation:numPulse .4s ease-out}
+
+        /* ═══════════════════════════════════════════════════════════ */
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
         .loader {
@@ -308,8 +424,66 @@
     </style>
 </head>
 <body>
+    <!-- Floating Orbs -->
+    <div class="float-orb float-orb-1"></div>
+    <div class="float-orb float-orb-2"></div>
+    <div class="float-orb float-orb-3"></div>
+
     <div id="root"></div>
     <div id="toast-container"></div>
+    <div id="confetti-fx"></div>
+
+    <!-- Animation Engine -->
+    <script>
+    (function(){
+        // Scroll Reveal Observer
+        const srObs = new IntersectionObserver(entries => {
+            entries.forEach(e => { if(e.isIntersecting){e.target.classList.add('sr-visible');srObs.unobserve(e.target);} });
+        }, {threshold:0.08, rootMargin:'0px 0px -30px 0px'});
+        function initSR(){document.querySelectorAll('.scroll-reveal').forEach(el=>srObs.observe(el));}
+
+        // Ripple on click
+        window._ripple = function(e){
+            const el=e.currentTarget;el.style.position='relative';el.style.overflow='hidden';
+            const r=el.getBoundingClientRect(),sz=Math.max(r.width,r.height),s=document.createElement('span');
+            s.className='ripple-fx';s.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-r.left-sz/2}px;top:${e.clientY-r.top-sz/2}px`;
+            el.appendChild(s);setTimeout(()=>s.remove(),600);
+        };
+
+        // Sparkle burst
+        window._sparkle = function(el){
+            const r=el.getBoundingClientRect(),cols=['#FFB6C1','#89CFF0','#BDB2FF','#B5EAD7','#FFDAC1','#FF9EAE'];
+            for(let i=0;i<8;i++){const s=document.createElement('div');s.className='sparkle-dot';s.style.left=(r.left+Math.random()*r.width)+'px';s.style.top=(r.top+Math.random()*r.height)+'px';s.style.background=cols[~~(Math.random()*cols.length)];s.style.width=s.style.height=(4+Math.random()*6)+'px';s.style.animationDelay=(Math.random()*.3)+'s';document.body.appendChild(s);setTimeout(()=>s.remove(),1200);}
+        };
+
+        // Confetti
+        window._confetti = function(x,y){
+            const c=document.getElementById('confetti-fx'),cols=['#FFB6C1','#89CFF0','#BDB2FF','#B5EAD7','#FF9EAE','#FFDAC1','#feca57','#ff6b6b'];
+            for(let i=0;i<30;i++){const p=document.createElement('div');const sz=5+Math.random()*7;
+            p.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;border-radius:${Math.random()>.5?'50%':'2px'};background:${cols[~~(Math.random()*cols.length)]};pointer-events:none`;
+            const dx=(Math.random()-.5)*350,dy=-(100+Math.random()*280);
+            p.animate([{transform:'translate(0,0) rotate(0) scale(1)',opacity:1},{transform:`translate(${dx}px,${dy}px) rotate(${Math.random()*720}deg) scale(0)`,opacity:0}],{duration:700+Math.random()*700,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});
+            c.appendChild(p);setTimeout(()=>p.remove(),1500);}
+        };
+
+        // Stagger children animation
+        window._stagger = function(selector, delay){
+            delay=delay||70;
+            document.querySelectorAll(selector).forEach((el,i)=>{el.style.animationDelay=(i*delay)+'ms';});
+        };
+
+        // Auto-init scroll reveal on DOM changes
+        const mo = new MutationObserver(()=>{initSR();});
+        mo.observe(document.body, {childList:true, subtree:true});
+        document.addEventListener('DOMContentLoaded', initSR);
+
+        // Add click sparkle to buttons globally
+        document.addEventListener('click', function(e){
+            const btn = e.target.closest('.btn-primary, .btn-secondary');
+            if(btn){window._ripple(e);window._sparkle(btn);}
+        });
+    })();
+    </script>
 
     <script type="text/babel" data-presets="react,env">
         const { useState, useEffect, useMemo, useRef, useCallback } = React;
@@ -484,6 +658,10 @@
             el.className = `toast toast-${type}`;
             el.textContent = msg;
             container.appendChild(el);
+            // Sparkle on success
+            if (type === 'success' && window._confetti) {
+                setTimeout(() => window._confetti(window.innerWidth / 2, window.innerHeight - 100), 150);
+            }
             setTimeout(() => {
                 el.classList.add('out');
                 setTimeout(() => el.remove(), 280);
@@ -1235,9 +1413,9 @@
                 if (showModeSelect || (!isLocalMode && (!user || user.isAnonymous))) {
                     return (
                         <div className="h-screen flex items-center justify-center p-4 animate-pop">
-                            <div className="glass-card p-8 text-center max-w-xs w-full shadow-2xl">
-                                <div className="w-20 h-20 bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] rounded-[24px] flex items-center justify-center mx-auto mb-5 shadow-lg text-5xl border-4 border-white">🧸</div>
-                                <h1 className="text-2xl font-bold mb-1 text-[#2B3A4A]">Expense Pro</h1>
+                            <div className="glass-card p-8 text-center max-w-xs w-full shadow-2xl pulse-glow">
+                                <div className="w-20 h-20 bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] rounded-[24px] flex items-center justify-center mx-auto mb-5 shadow-lg text-5xl border-4 border-white anim-bounce" style={{animationDelay:'0.2s'}}>🧸</div>
+                                <h1 className="text-2xl font-bold mb-1 shimmer-title">Expense Pro</h1>
                                 <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">แอปจัดการบิลกลุ่มและทริปเพื่อน<br/>เลือกวิธีการใช้งาน ✨</p>
 
                                 {/* LOCAL MODE */}
@@ -1295,10 +1473,10 @@
 
             // ── Main Render ────────────────────────────────────────────────────────
             return (
-                <div className="min-h-screen pb-16">
+                <div className="min-h-screen pb-16 page-enter">
                     {/* Header */}
-                    <header className="p-3 sticky top-0 z-50">
-                        <div className="max-w-2xl mx-auto glass-card px-4 py-2.5 flex items-center justify-between shadow-md">
+                    <header className="p-3 sticky top-0 z-50" style={{animation:'slideDown .5s cubic-bezier(.22,1,.36,1) both'}}>
+                        <div className="max-w-2xl mx-auto glass-card px-4 py-2.5 flex items-center justify-between shadow-md" style={{backdropFilter:'saturate(180%) blur(20px)'}}>
                             <div className="flex items-center gap-2">
                                 {view === 'detail' && <button onClick={() => setView('list')} className="p-1.5 hover:bg-white/50 rounded-xl transition-all"><LucideIcon name="arrow-left" className="w-5 h-5" /></button>}
                                 {view === 'dashboard' && <button onClick={() => { window.location.href = window.location.href.split('?')[0]; }} className="p-1.5 hover:bg-white/50 rounded-xl transition-all"><LucideIcon name="home" className="w-5 h-5" /></button>}
@@ -1399,10 +1577,10 @@
                                 </button>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {groups.map(g => {
+                                {groups.map((g, _gi) => {
                                     const isOwner = g.ownerId === user?.uid;
                                     return (
-                                    <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); }} className="glass-card p-4 cursor-pointer relative group/card hover:shadow-xl hover:-translate-y-0.5 transition-all bg-white/40">
+                                    <div key={g.id} onClick={() => { setActiveGroup(g); setView('detail'); if(window._confetti){const r=document.body.getBoundingClientRect();window._confetti(r.width/2,r.height/3);} }} className="glass-card p-4 cursor-pointer relative group/card glow-hover icon-bounce bg-white/40 scroll-reveal stagger-item" style={{animationDelay:(_gi*80)+'ms'}}>
                                         {/* Owner เห็นปุ่มลบ / สมาชิกเห็นปุ่มออกจากกลุ่ม */}
                                         {isOwner ? (
                                             <button onClick={(e) => deleteGroup(g.id, e)} title="ลบกลุ่ม" className="absolute top-3 right-3 text-slate-300 hover:text-red-400 opacity-0 group-hover/card:opacity-100 transition-opacity p-1.5 bg-white/60 rounded-full z-10">
@@ -1461,9 +1639,9 @@
 
                     {/* ─── DASHBOARD VIEW ────────────────────────────────────────── */}
                     {view === 'dashboard' && activeGroup && (
-                        <div className="space-y-4 pb-16 animate-pop">
+                        <div className="space-y-4 pb-16 animate-pop page-enter">
                             {/* Hero */}
-                            <div className="glass-card p-6 relative overflow-hidden section-pink text-center">
+                            <div className="glass-card p-6 relative overflow-hidden section-pink text-center banner-shim grad-shift pulse-glow">
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 overflow-hidden">
                                     <span className="text-[180px] leading-none transform rotate-12 scale-125 blur-xl">{getGroupStyle(activeGroup).emoji}</span>
                                 </div>
@@ -1504,11 +1682,11 @@
                             </div>
 
                             {/* Settlements */}
-                            <div className="glass-card p-5 section-mint">
-                                <h3 className="font-bold text-base mb-4">💸 สรุปการเคลียร์เงิน</h3>
+                            <div className="glass-card p-5 section-mint scroll-reveal">
+                                <h3 className="font-bold text-base mb-4"><span className="heartbeat">💸</span> สรุปการเคลียร์เงิน</h3>
                                 <div className="space-y-2.5">
                                     {settlements.map((s, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3.5 bg-white/90 rounded-2xl border border-white shadow-sm">
+                                        <div key={idx} className="flex items-center justify-between p-3.5 bg-white/90 rounded-2xl border border-white shadow-sm glow-hover stagger-item" style={{animationDelay:(idx*80)+'ms'}}>
                                             <div className="flex items-center gap-2 flex-1">
                                                 <Avatar name={s.from} group={activeGroup} size="sm" />
                                                 <span className="font-bold text-xs">{s.from}</span>
@@ -1527,11 +1705,11 @@
                             </div>
 
                             {/* All Bills */}
-                            <div className="glass-card p-5 section-purple">
-                                <h3 className="font-bold text-base mb-4">🧾 บิลทั้งหมด</h3>
+                            <div className="glass-card p-5 section-purple scroll-reveal">
+                                <h3 className="font-bold text-base mb-4"><span className="heartbeat">🧾</span> บิลทั้งหมด</h3>
                                 <div className="space-y-2">
-                                    {expenses.map(e => (
-                                        <div key={e.id} className="glass-card p-3.5 flex justify-between items-center bg-white/70 border-white">
+                                    {expenses.map((e, _di) => (
+                                        <div key={e.id} className="glass-card p-3.5 flex justify-between items-center bg-white/70 border-white glow-hover stagger-item" style={{animationDelay:(_di*60)+'ms'}}>
                                             <div className="flex items-center gap-2.5">
                                                 <Avatar name={e.payer} group={activeGroup} size="sm" />
                                                 <div>
@@ -1553,16 +1731,16 @@
 
                     {/* ─── DETAIL VIEW ───────────────────────────────────────────── */}
                     {view === 'detail' && activeGroup && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 page-enter">
 
                             {/* 1. จัดการสมาชิก */}
-                            <div className="glass-card p-4 section-peach">
+                            <div className="glass-card p-4 section-peach scroll-reveal">
                                 <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2 mb-4">
-                                    <span className="text-2xl">👥</span> จัดการสมาชิก
+                                    <span className="text-2xl heartbeat">👥</span> จัดการสมาชิก
                                 </h3>
                                 <div className="flex flex-wrap gap-2 mb-3">
-                                    {(activeGroup.members||[]).map(m => (
-                                        <div key={m} className="bg-white px-2.5 py-1.5 rounded-xl flex items-center gap-2 shadow-sm border border-white">
+                                    {(activeGroup.members||[]).map((m, _mi) => (
+                                        <div key={m} className="bg-white px-2.5 py-1.5 rounded-xl flex items-center gap-2 shadow-sm border border-white anim-pop icon-bounce" style={{animationDelay:(_mi*50)+'ms'}}>
                                             <Avatar name={m} group={activeGroup} size="xs" />
                                             <span className="text-xs font-bold">{m}</span>
                                             <button onClick={() => openMemberEditor(m)} className="text-slate-300 hover:text-blue-400 p-0.5 rounded transition-colors"><LucideIcon name="edit-2" className="w-2.5 h-2.5" /></button>
@@ -1577,9 +1755,9 @@
                             </div>
 
                             {/* 2. ยอดรวมทั้งหมด */}
-                            <div className="glass-card p-5 relative overflow-hidden section-pink">
+                            <div className="glass-card p-5 relative overflow-hidden section-pink scroll-reveal banner-shim">
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 overflow-hidden">
-                                    <span className="text-[200px] leading-none transform rotate-12 scale-125 blur-xl">{getGroupStyle(activeGroup).emoji}</span>
+                                    <span className="text-[200px] leading-none transform rotate-12 scale-125 blur-xl heartbeat">{getGroupStyle(activeGroup).emoji}</span>
                                 </div>
                                 <div className="relative z-10">
                                     <div className="flex justify-between items-start mb-2">
@@ -1602,10 +1780,10 @@
                             </div>
 
                             {/* 3. เคลียร์เงิน */}
-                            <div className="glass-card p-5 section-mint">
+                            <div className="glass-card p-5 section-mint scroll-reveal">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2">
-                                        <span className="text-2xl">💸</span> เคลียร์เงิน
+                                        <span className="text-2xl heartbeat">💸</span> เคลียร์เงิน
                                     </h3>
                                     <div className="flex gap-1.5">
                                         <button onClick={exportImage} title="Export Image" className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-pink-400"><LucideIcon name="image" className="w-4 h-4" /></button>
@@ -1618,7 +1796,7 @@
                                         const key = settlementKey(s);
                                         const isPaid = paidSettlements.has(key);
                                         return (
-                                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border border-white shadow-sm transition-all ${isPaid ? 'settlement-paid bg-white/50' : 'bg-white/90'}`}>
+                                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border border-white shadow-sm transition-all glow-hover stagger-item ${isPaid ? 'settlement-paid bg-white/50' : 'bg-white/90'}`} style={{animationDelay:(idx*70)+'ms'}}>
                                             <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                                 <Avatar name={s.from} group={activeGroup} size="xs" />
                                                 <span className="font-bold text-xs settlement-text">{s.from}</span>
@@ -1647,10 +1825,10 @@
                             </div>
 
                             {/* 4. บิลทั้งหมด */}
-                            <div className="glass-card p-4 section-purple">
+                            <div className="glass-card p-4 section-purple scroll-reveal">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2">
-                                        <span className="text-2xl">🧾</span> บิลทั้งหมด
+                                        <span className="text-2xl heartbeat">🧾</span> บิลทั้งหมด
                                     </h3>
                                     <button onClick={() => { setEditingExpense(null); setExpDesc(''); setExpAmount(''); setExpPayer((activeGroup.members||[])[0]||''); setExpParticipants(activeGroup.members||[]); setShowExpenseModal(true); }}
                                         className="btn-primary px-4 py-2 text-xs font-bold shadow-md flex items-center gap-1.5">
@@ -1658,8 +1836,8 @@
                                     </button>
                                 </div>
                                 <div className="space-y-2">
-                                    {expenses.map(e => (
-                                        <div key={e.id} className="glass-card p-3 flex justify-between items-center group/item bg-white/70 border-white">
+                                    {expenses.map((e, _ei) => (
+                                        <div key={e.id} className="glass-card p-3 flex justify-between items-center group/item bg-white/70 border-white glow-hover scroll-reveal stagger-item" style={{animationDelay:(_ei*60)+'ms'}}>
                                             <div className="flex items-center gap-2.5">
                                                 <Avatar name={e.payer} group={activeGroup} size="sm" />
                                                 <div>
@@ -1684,13 +1862,13 @@
                             </div>
 
                             {/* 5. สรุปค่าใช้จ่ายแต่ละคน */}
-                            <div className="glass-card p-4 section-blue">
+                            <div className="glass-card p-4 section-blue scroll-reveal">
                                 <h3 className="font-black text-xl text-[#2B3A4A] flex items-center gap-2 mb-4">
-                                    <span className="text-2xl">📊</span> สรุปค่าใช้จ่ายแต่ละคน
+                                    <span className="text-2xl heartbeat">📊</span> สรุปค่าใช้จ่ายแต่ละคน
                                 </h3>
                                 <div className="space-y-2">
                                     {individualShares.map((item, idx) => (
-                                        <div key={idx} className="p-3.5 bg-white/80 rounded-2xl border border-white shadow-sm">
+                                        <div key={idx} className="p-3.5 bg-white/80 rounded-2xl border border-white shadow-sm glow-hover stagger-item scroll-reveal" style={{animationDelay:(idx*70)+'ms'}}>
                                             <div className="flex items-center justify-between mb-2.5">
                                                 <div className="flex items-center gap-2">
                                                     <Avatar name={item.name} group={activeGroup} size="sm" />
@@ -2030,7 +2208,7 @@
                                             })}
                                         </div>
                                     </div>
-                                    <button onClick={saveExpense} className="w-full btn-primary py-4 text-base font-bold shadow-xl">บันทึกบิลเลย ✨</button>
+                                    <button onClick={(e) => { saveExpense(); if(window._confetti) window._confetti(e.clientX||window.innerWidth/2, e.clientY||window.innerHeight/2); }} className="w-full btn-primary py-4 text-base font-bold shadow-xl">บันทึกบิลเลย ✨</button>
                                 </div>
                             </div>
                         </div>
