@@ -1498,7 +1498,8 @@
                                                 value={localNameInput}
                                                 onChange={e => setLocalNameInput(e.target.value)}
                                                 onKeyDown={e => {
-                                                    if (e.key === 'Enter' && localNameInput.trim()) {
+                                                    if (e.key === 'Enter') {
+                                                        if (!localNameInput.trim()) { showToast('กรุณาพิมพ์ชื่อก่อนนะ ✏️', 'warning', 2500); return; }
                                                         const u = LocalDB.setLocalUser(localNameInput.trim());
                                                         localStorage.setItem(LOCAL_MODE_KEY, '1');
                                                         setIsLocalMode(true); setUser(u); setShowModeSelect(false);
@@ -1513,7 +1514,7 @@
                                     )}
                                     <button
                                         onClick={() => {
-                                            if (!localNameInput.trim()) { setLocalNameInput(''); return; }
+                                            if (!localNameInput.trim()) { showToast('กรุณาพิมพ์ชื่อก่อนนะ ✏️', 'warning', 2500); return; }
                                             const u = LocalDB.setLocalUser(localNameInput.trim());
                                             localStorage.setItem(LOCAL_MODE_KEY, '1');
                                             setIsLocalMode(true); setUser(u); setShowModeSelect(false);
