@@ -701,7 +701,7 @@
         const MEMBER_EMOJIS = ['😊','😎','🥳','🐱','🐶','🦊','🐼','🐨','🦁','🐯','🐸','🐥','🦄','🐉','🌸','⭐','🌙','💫','🍀','🌵'];
         const PASTEL_COLORS = ['#FFD1DC','#F8E2E9','#FADADD','#E6E6FA','#E0F7FA','#D0E8F2','#B0E0E6','#FFB6C1','#FFDAC1','#FFB7B2','#FF9AA2','#E2F0CB','#B5EAD7','#C7CEEA','#F1CBFF','#D4F0F0','#FDFD96','#FFDFD3','#FEC8D8','#D291BC'];
         const VIBRANT_COLORS = ['#FF595E','#FFCA3A','#8AC926','#1982C4','#6A4C93','#F15BB5','#00BBF9','#00F5D4','#F28F3B','#C8E9A0','#FF9AA2','#B5EAD7','#C7CEEA','#E2F0CB','#FFB7B2','#E6A8D7','#97C1A9','#8FCACA','#F6A6FF','#B28DFF'];
-        const MEMBER_BG_COLORS = ['#FF9AA2','#FFB7B2','#FFDAC1','#E2F0CB','#B5EAD7','#C7CEEA','#FF9AA2','#FFDAC1','#B5EAD7','#C7CEEA','#F6A6FF','#B28DFF','#8FCACA','#E6A8D7','#97C1A9','#FFCA3A','#8AC926','#1982C4','#F15BB5','#00BBF9'];
+        const MEMBER_BG_COLORS = ['#FF9AA2','#FFB7B2','#FFDAC1','#E2F0CB','#B5EAD7','#C7CEEA','#F6A6FF','#B28DFF','#8FCACA','#E6A8D7','#97C1A9','#FFCA3A','#8AC926','#1982C4','#F15BB5','#00BBF9','#FFC8DD','#BDE0FE','#A2D2FF','#CDB4DB'];
 
         // shape definitions — id, css class, display preview
         const AVATAR_SHAPES = [
@@ -2156,12 +2156,17 @@
 
                     {/* ─── MODAL: Edit Member ──────────────────────────────────────── */}
                     {showMemberEditor && editingMemberData && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#2B3A4A]/20 backdrop-blur-md animate-pop">
-                            <div className="glass-card p-6 w-full max-w-sm shadow-2xl bg-white/95 max-h-[90vh] overflow-y-auto no-scrollbar">
-                                <h3 className="text-xl font-bold mb-1 text-center">แก้ไขสมาชิก 👤</h3>
-                                <p className="text-xs text-slate-400 text-center mb-4">เปลี่ยนชื่อ รูปร่าง สี และอีโมจิ</p>
+                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#2B3A4A]/20 backdrop-blur-md animate-pop">
+                            <div className="glass-card w-full max-w-sm sm:rounded-[28px] rounded-t-[28px] shadow-2xl bg-white/95 max-h-[90vh] flex flex-col overflow-hidden">
+                                {/* Header - fixed top */}
+                                <div className="px-6 pt-5 pb-3 border-b border-slate-100 shrink-0">
+                                    <h3 className="text-xl font-bold mb-1 text-center">แก้ไขสมาชิก 👤</h3>
+                                    <p className="text-xs text-slate-400 text-center">เปลี่ยนชื่อ รูปร่าง สี และอีโมจิ</p>
+                                </div>
                                 
-                                {/* Preview — renders same Avatar logic inline */}
+                                {/* Scrollable content */}
+                                <div className="flex-1 overflow-y-auto no-scrollbar px-6 py-4">
+                                {/* Preview */}
                                 {(() => {
                                     const previewShape = AVATAR_SHAPES.find(s => s.id === memberNewShape) || AVATAR_SHAPES[0];
                                     return (
@@ -2179,14 +2184,13 @@
 
                                 <input value={memberNewName} onChange={e => setMemberNewName(e.target.value)} placeholder="ชื่อสมาชิก" className="w-full bg-slate-50 rounded-xl px-4 py-2.5 font-bold text-sm mb-4 outline-none focus:ring-2 ring-[#FFD1DC] text-center" />
                                 
-                                {/* ── Shape Picker ── */}
+                                {/* Shape Picker */}
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">รูปร่างไอคอน</p>
                                 <div className="grid grid-cols-7 gap-1.5 mb-4">
                                     {AVATAR_SHAPES.map(sh => (
                                         <button key={sh.id} onClick={() => setMemberNewShape(sh.id)}
                                             className={`shape-picker-btn aspect-square ${memberNewShape === sh.id ? 'selected' : ''}`}
                                             title={sh.id}>
-                                            {/* mini avatar preview using the actual shape CSS */}
                                             <div style={{backgroundColor: memberNewColor}}
                                                  className={`w-8 h-8 ${sh.cls} flex items-center justify-center text-white font-black text-sm`}>
                                                 <span className="leading-none text-xs drop-shadow-sm">
@@ -2206,14 +2210,16 @@
                                 </div>
                                 
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">สีพื้นหลัง</p>
-                                <div className="flex flex-wrap gap-2 mb-5">
-                                    {[...VIBRANT_COLORS, ...MEMBER_BG_COLORS.slice(0,10)].map((c, i) => (
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {[...new Set([...VIBRANT_COLORS, ...MEMBER_BG_COLORS])].map((c, i) => (
                                         <div key={i} onClick={() => setMemberNewColor(c)} style={{backgroundColor:c}} className={`color-swatch ${memberNewColor===c?'selected':''}`}></div>
                                     ))}
                                 </div>
+                                </div>
                                 
-                                <div className="flex gap-2">
-                                    <button onClick={() => { setShowMemberEditor(false); setEditingMemberData(null); }} className="flex-1 py-3 font-bold text-slate-400 text-sm">ยกเลิก</button>
+                                {/* Buttons - sticky bottom */}
+                                <div className="flex gap-2 px-6 py-4 border-t border-slate-100 bg-white/95 shrink-0">
+                                    <button onClick={() => { setShowMemberEditor(false); setEditingMemberData(null); }} className="flex-1 py-3 font-bold text-slate-400 text-sm rounded-2xl bg-slate-50 hover:bg-slate-100 transition-all">ยกเลิก</button>
                                     <button onClick={saveMemberEdit} className="btn-primary flex-[2] py-3 font-bold text-sm">บันทึก</button>
                                 </div>
                             </div>
