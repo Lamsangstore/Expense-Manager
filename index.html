@@ -68,7 +68,7 @@
             border-radius: 18px;
             transition: all 0.1s;
         }
-        .btn-primary:active { transform: translateY(2px); border-bottom-width: 2px; }
+        .btn-primary:active { border-bottom-width: 2px; opacity: 0.85; }
 
         .btn-secondary {
             background: linear-gradient(135deg, #B0E0E6, #ADD8E6);
@@ -77,7 +77,7 @@
             border-radius: 18px;
             transition: all 0.1s;
         }
-        .btn-secondary:active { transform: translateY(2px); border-bottom-width: 2px; }
+        .btn-secondary:active { border-bottom-width: 2px; opacity: 0.85; }
 
         /* ── Avatar shape variants ─────────────────────────────── */
         /* default = rounded square (squircle) */
@@ -108,8 +108,8 @@
         .shape-picker-btn:hover { background:white; }
         .shape-picker-btn.selected { border-color:#2B3A4A; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
 
-        .animate-pop { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.94) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .animate-pop { animation: popIn 0.25s ease both; }
+        @keyframes popIn { from { opacity: 0; } to { opacity: 1; } }
 
         /* ═══════════════════════════════════════════════════════════
            🎬 MEGA ANIMATION PACK v2 — Ultra Modern Edition
@@ -128,7 +128,7 @@
 
         /* ── Page Entrance ── */
         @keyframes pageSlideUp{from{opacity:0;transform:translateY(30px) scale(.98)}to{opacity:1;transform:none}}
-        .page-enter{animation:pageSlideUp .7s cubic-bezier(.22,1,.36,1) both}
+        .page-enter{animation:pageSlideUp .7s cubic-bezier(.22,1,.36,1) forwards}
 
         /* ── Stagger Fade Up ── */
         @keyframes fadeSlideUp{from{opacity:0;transform:translateY(35px) scale(.96);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
@@ -141,101 +141,92 @@
         .anim-right{animation:slideInRight .6s cubic-bezier(.22,1,.36,1) both}
 
         /* ── Scale Pop ── */
-        @keyframes scalePop{0%{opacity:0;transform:scale(.4)}60%{transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
-        .anim-pop{animation:scalePop .5s cubic-bezier(.34,1.56,.64,1) both}
+        @keyframes scalePop{from{opacity:0}to{opacity:1}}
+        .anim-pop{animation:scalePop .3s ease both}
 
         /* ── Bounce In ── */
-        @keyframes bounceIn{0%{opacity:0;transform:scale(.3)}50%{transform:scale(1.08)}70%{transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
-        .anim-bounce{animation:bounceIn .7s cubic-bezier(.34,1.56,.64,1) both}
+        @keyframes bounceIn{from{opacity:0}to{opacity:1}}
+        .anim-bounce{animation:bounceIn .3s ease both}
 
         /* ── Heartbeat ── */
-        @keyframes heartbeat{0%,100%{transform:scale(1)}15%{transform:scale(1.25)}30%{transform:scale(1)}45%{transform:scale(1.15)}}
-        .heartbeat{display:inline-block;animation:heartbeat 1.8s ease-in-out infinite}
+        .heartbeat{display:inline-block}
 
-        /* ── Pulse Glow (ClearBill mint) ── */
-        @keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(184,232,208,0.5)}50%{box-shadow:0 0 24px 10px rgba(184,232,208,0.18)}}
-        .pulse-glow{animation:pulseGlow 2.5s ease-in-out infinite}
+        /* ── Pulse Glow ── */
+        .pulse-glow{}
 
         /* ── Wiggle ── */
-        @keyframes wiggle{0%,100%{transform:rotate(0)}20%{transform:rotate(-4deg)}40%{transform:rotate(4deg)}60%{transform:rotate(-2deg)}80%{transform:rotate(2deg)}}
 
-        /* ── Shimmer Text (ClearBill colors) ── */
-        @keyframes shimmerText{0%{background-position:-200% center}100%{background-position:200% center}}
-        .shimmer-title{background:linear-gradient(90deg,#2B3A4A 0%,#4ECDC4 20%,#89CFF0 40%,#BDB2FF 60%,#FF9EAE 80%,#2B3A4A 100%);background-size:400% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmerText 4s linear infinite}
-        body.dark .shimmer-title{background:linear-gradient(90deg,#f1f5f9 0%,#6ee7b7 20%,#a8dfff 40%,#d4c8ff 60%,#ffb8c8 80%,#f1f5f9 100%);background-size:400% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmerText 4s linear infinite}
+        /* ── Shimmer Text ── */
+        .shimmer-title{color:#2B3A4A}
+        body.dark .shimmer-title{color:#f1f5f9}
 
         /* ── Ripple Click ── */
-        .ripple-fx{position:absolute;border-radius:50%;background:rgba(184,232,208,0.35);transform:scale(0);animation:rippleFx .7s ease-out forwards;pointer-events:none}
-        @keyframes rippleFx{to{transform:scale(4);opacity:0}}
+        .ripple-fx{display:none}
 
         /* ── Sparkle ── */
-        @keyframes sparkleFx{0%{opacity:0;transform:scale(0) rotate(0)}50%{opacity:1;transform:scale(1) rotate(180deg)}100%{opacity:0;transform:scale(0) rotate(360deg)}}
-        .sparkle-dot{position:fixed;border-radius:50%;animation:sparkleFx .8s ease-out forwards;pointer-events:none;z-index:9999}
+        .sparkle-dot{display:none}
 
         /* ── Confetti ── */
-        #confetti-fx{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+        #confetti-fx{display:none}
 
-        /* ── Gradient Shift (for banners) ── */
-        @keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-        .grad-shift{background-size:200% 200%;animation:gradShift 6s ease infinite}
+        /* ── Gradient Shift ── */
+        .grad-shift{}
 
         /* ── Banner Shimmer Light ── */
-        @keyframes bannerShim{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
-        .banner-shim::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:bannerShim 3s ease-in-out infinite;pointer-events:none;border-radius:inherit}
+        .banner-shim::after{display:none}
 
-        /* ── Glow Ring on Hover (upgraded) ── */
-        .glow-hover{position:relative;transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .4s}
-        .glow-hover:hover{transform:translateY(-5px) scale(1.02);box-shadow:0 20px 50px -10px rgba(184,232,208,0.35),0 0 0 1px rgba(184,232,208,0.15) !important}
-        .glow-hover:active{transform:scale(.97);transition-duration:.1s}
+        /* ── Glow Ring on Hover ── */
+        .glow-hover{position:relative;transition:box-shadow .3s}
+        .glow-hover:hover{box-shadow:0 4px 16px rgba(0,0,0,0.08) !important}
+        .glow-hover:active{}
 
-        /* ── Rainbow Border Glow (new) ── */
+        /* ── Rainbow Border Glow ── */
         .rainbow-glow{position:relative}
-        .rainbow-glow::before{content:'';position:absolute;inset:-2px;border-radius:inherit;background:linear-gradient(135deg,#B8E8D0,#89CFF0,#BDB2FF,#FF9EAE,#FFDAC1,#B8E8D0);background-size:300% 300%;animation:gradShift 4s ease infinite;opacity:0;transition:opacity .4s;z-index:-1;filter:blur(6px)}
-        .rainbow-glow:hover::before{opacity:.6}
+        .rainbow-glow::before{display:none}
 
         /* ── Icon Bounce on Hover ── */
-        .icon-bounce:hover .avatar-icon{animation:bounceIn .5s cubic-bezier(.34,1.56,.64,1)}
+        .icon-bounce:hover .avatar-icon{}
 
         /* ── Scroll Reveal ── */
         .scroll-reveal{opacity:0;transform:translateY(40px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
         .scroll-reveal.sr-visible{opacity:1;transform:none}
 
-        /* ── Button Hover (enhanced with glow trail) ── */
-        .btn-primary{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important;position:relative;overflow:hidden}
-        .btn-primary:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 10px 30px rgba(184,232,208,0.4),0 0 0 1px rgba(184,232,208,0.2) !important}
-        .btn-primary:active{transform:translateY(1px) scale(.98) !important}
-        .btn-secondary{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important;position:relative;overflow:hidden}
-        .btn-secondary:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 10px 30px rgba(137,207,240,0.4),0 0 0 1px rgba(137,207,240,0.2) !important}
-        .btn-secondary:active{transform:translateY(1px) scale(.98) !important}
+        /* ── Button Hover ── */
+        .btn-primary{transition:all .2s ease !important;position:relative;overflow:hidden}
+        .btn-primary:hover{box-shadow:0 4px 12px rgba(184,232,208,0.3) !important}
+        .btn-primary:active{opacity:0.85 !important}
+        .btn-secondary{transition:all .2s ease !important;position:relative;overflow:hidden}
+        .btn-secondary:hover{box-shadow:0 4px 12px rgba(137,207,240,0.3) !important}
+        .btn-secondary:active{opacity:0.85 !important}
 
         /* ── Glass Card Enhanced ── */
-        .glass-card{transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .4s,border-color .4s !important}
+        .glass-card{transition:box-shadow .3s,border-color .3s !important}
         .glass-card:hover{border-color:rgba(184,232,208,0.5) !important}
 
-        /* ── Input Focus (glowing ring) ── */
-        input:focus,textarea:focus{transition:all .3s cubic-bezier(.34,1.56,.64,1) !important;transform:scale(1.01);box-shadow:0 0 0 3px rgba(184,232,208,0.3),0 4px 15px rgba(184,232,208,0.15) !important}
+        /* ── Input Focus ── */
+        input:focus,textarea:focus{transition:box-shadow .2s ease !important;box-shadow:0 0 0 3px rgba(184,232,208,0.3) !important}
 
-        /* ── Emoji Hover (spin + scale) ── */
-        .emoji-option{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important}
-        .emoji-option:hover{transform:scale(1.3) rotate(-12deg) !important;box-shadow:0 4px 15px rgba(0,0,0,0.12) !important}
+        /* ── Emoji Hover ── */
+        .emoji-option{transition:all .15s ease !important}
+        .emoji-option:hover{transform:scale(1.1) !important;box-shadow:0 2px 8px rgba(0,0,0,0.1) !important}
 
         /* ── Color Swatch Hover ── */
-        .color-swatch{transition:all .25s cubic-bezier(.34,1.56,.64,1) !important}
-        .color-swatch:hover{transform:scale(1.35) !important;box-shadow:0 4px 12px rgba(0,0,0,0.15) !important}
+        .color-swatch{transition:all .15s ease !important}
+        .color-swatch:hover{transform:scale(1.15) !important;box-shadow:0 2px 8px rgba(0,0,0,0.1) !important}
 
         /* ── Staggered List Items ── */
-        .stagger-item{animation:fadeSlideUp .5s cubic-bezier(.22,1,.36,1) both}
+        .stagger-item{animation:simpleFade .3s ease both}
+        @keyframes simpleFade{from{opacity:0}to{opacity:1}}
 
         /* ── Slide Down Nav ── */
         @keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:none;opacity:1}}
 
         /* ── Number Pulse ── */
-        @keyframes numPulse{0%{transform:scale(1)}50%{transform:scale(1.15);color:#4ECDC4}100%{transform:scale(1)}}
-        .num-pulse{animation:numPulse .4s ease-out}
+        .num-pulse{}
 
-        /* ── Floating Coins (new - for money app) ── */
-        @keyframes floatCoin{0%{transform:translateY(100vh) rotate(0);opacity:0}10%{opacity:.6}90%{opacity:.6}100%{transform:translateY(-100px) rotate(720deg);opacity:0}}
-        .floating-coin{position:fixed;pointer-events:none;z-index:0;font-size:20px;opacity:0;animation:floatCoin linear infinite}
+        /* ── Floating Coins (subtle bg for money app) ── */
+        @keyframes floatCoin{0%{transform:translateY(100vh) rotate(0);opacity:0}10%{opacity:.3}90%{opacity:.3}100%{transform:translateY(-100px) rotate(720deg);opacity:0}}
+        .floating-coin{display:none}
 
         /* ── Morphing Blob (new - for login screen bg) ── */
         @keyframes morphBlob{0%,100%{border-radius:42% 58% 70% 30% / 45% 45% 55% 55%}25%{border-radius:73% 27% 26% 74% / 55% 72% 28% 45%}50%{border-radius:28% 72% 44% 56% / 49% 40% 60% 51%}75%{border-radius:40% 60% 67% 33% / 37% 65% 35% 63%}}
@@ -245,17 +236,15 @@
         @keyframes blinkCursor{0%,100%{opacity:1}50%{opacity:0}}
         .type-cursor::after{content:'|';animation:blinkCursor 1s step-end infinite;color:#4ECDC4;font-weight:300}
 
-        /* ── Elastic Wobble (new - for cards on tap) ── */
-        @keyframes elasticWobble{0%{transform:scale(1)}30%{transform:scale(.95)}50%{transform:scale(1.03)}70%{transform:scale(.99)}100%{transform:scale(1)}}
-        .elastic-tap:active{animation:elasticWobble .4s ease-out}
+        /* ── Elastic Wobble ── */
+        .elastic-tap:active{}
 
-        /* ── Shine Sweep (new - for amount display) ── */
-        @keyframes shineSweep{0%{left:-100%}100%{left:200%}}
+        /* ── Shine Sweep ── */
         .shine-sweep{position:relative;overflow:hidden}
-        .shine-sweep::after{content:'';position:absolute;top:0;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);animation:shineSweep 3s ease-in-out infinite;pointer-events:none}
+        .shine-sweep::after{display:none}
 
-        /* ── Magnetic Tilt (via JS) ── */
-        .tilt-card{transition:transform .15s ease-out;transform-style:preserve-3d}
+        /* ── Magnetic Tilt ── */
+        .tilt-card{}
 
         /* ── Progress Bar Animation (new) ── */
         @keyframes progressGrow{from{width:0}to{width:var(--progress,0%)}}
@@ -297,10 +286,10 @@
 
         .emoji-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
         .emoji-option { font-size: 22px; cursor: pointer; padding: 6px; border-radius: 10px; text-align: center; transition: all 0.15s; background: rgba(255,255,255,0.5); }
-        .emoji-option:hover, .emoji-option.selected { background: white; transform: scale(1.2); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .emoji-option:hover, .emoji-option.selected { background: white; transform: scale(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         
         .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.15s; flex-shrink: 0; }
-        .color-swatch.selected { border-color: #2B3A4A; transform: scale(1.2); }
+        .color-swatch.selected { border-color: #2B3A4A; transform: scale(1.1); }
 
         /* Compact for mobile */
         @media (max-width: 640px) {
@@ -457,79 +446,18 @@
         }, {threshold:0.08, rootMargin:'0px 0px -30px 0px'});
         function initSR(){document.querySelectorAll('.scroll-reveal').forEach(el=>srObs.observe(el));}
 
-        // Ripple on click
-        window._ripple = function(e){
-            const el=e.currentTarget;el.style.position='relative';el.style.overflow='hidden';
-            const r=el.getBoundingClientRect(),sz=Math.max(r.width,r.height)*2,s=document.createElement('span');
-            s.className='ripple-fx';s.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-r.left-sz/2}px;top:${e.clientY-r.top-sz/2}px`;
-            el.appendChild(s);setTimeout(()=>s.remove(),700);
-        };
+        // Ripple on click (disabled)
+        window._ripple = function(){};
 
-        // Sparkle burst (upgraded with stars)
-        window._sparkle = function(el){
-            const r=el.getBoundingClientRect();
-            const cols=['#B8E8D0','#89CFF0','#BDB2FF','#FFDAC1','#FF9EAE','#4ECDC4','#feca57'];
-            const shapes=['●','✦','✧','◆','★'];
-            for(let i=0;i<12;i++){
-                const s=document.createElement('div');s.className='sparkle-dot';
-                s.style.left=(r.left+r.width/2+((Math.random()-.5)*r.width*1.5))+'px';
-                s.style.top=(r.top+r.height/2+((Math.random()-.5)*r.height*1.5))+'px';
-                s.style.background=cols[~~(Math.random()*cols.length)];
-                s.style.width=s.style.height=(3+Math.random()*8)+'px';
-                s.style.animationDelay=(Math.random()*.4)+'s';
-                s.style.animationDuration=(.5+Math.random()*.5)+'s';
-                document.body.appendChild(s);setTimeout(()=>s.remove(),1500);
-            }
-        };
+        // Sparkle burst (disabled)
+        window._sparkle = function(){};
 
-        // Confetti (upgraded with more variety)
-        window._confetti = function(x,y){
-            const c=document.getElementById('confetti-fx');
-            const cols=['#B8E8D0','#89CFF0','#BDB2FF','#FF9EAE','#FFDAC1','#4ECDC4','#feca57','#ff6b6b','#6ee7b7'];
-            for(let i=0;i<35;i++){
-                const p=document.createElement('div');const sz=4+Math.random()*8;
-                const isCircle=Math.random()>.6;
-                p.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:${sz}px;height:${isCircle?sz:sz*2}px;border-radius:${isCircle?'50%':'2px'};background:${cols[~~(Math.random()*cols.length)]};pointer-events:none`;
-                const dx=(Math.random()-.5)*400,dy=-(120+Math.random()*300);
-                p.animate([
-                    {transform:'translate(0,0) rotate(0) scale(1)',opacity:1},
-                    {transform:`translate(${dx}px,${dy}px) rotate(${Math.random()*900}deg) scale(0)`,opacity:0}
-                ],{duration:800+Math.random()*800,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});
-                c.appendChild(p);setTimeout(()=>p.remove(),1800);
-            }
-        };
+        // Confetti (disabled)
+        window._confetti = function(){};
 
-        // Magnetic tilt on hover (for glass-card)
-        document.addEventListener('mousemove',function(e){
-            document.querySelectorAll('.tilt-card').forEach(function(card){
-                const r=card.getBoundingClientRect();
-                const cx=r.left+r.width/2,cy=r.top+r.height/2;
-                const dx=(e.clientX-cx)/r.width,dy=(e.clientY-cy)/r.height;
-                const dist=Math.sqrt(dx*dx+dy*dy);
-                if(dist<1.2){
-                    card.style.transform='perspective(600px) rotateY('+dx*6+'deg) rotateX('+(-dy*6)+'deg) scale(1.02)';
-                }else{
-                    card.style.transform='';
-                }
-            });
-        });
+        // Magnetic tilt on hover (disabled)
 
-        // Floating coins background (money app vibe)
-        function spawnCoin(){
-            const coins=['💰','💵','💸','🪙','💲'];
-            const coin=document.createElement('div');
-            coin.className='floating-coin';
-            coin.textContent=coins[~~(Math.random()*coins.length)];
-            coin.style.left=(Math.random()*100)+'vw';
-            coin.style.fontSize=(14+Math.random()*12)+'px';
-            coin.style.animationDuration=(15+Math.random()*20)+'s';
-            coin.style.animationDelay=(Math.random()*5)+'s';
-            document.body.appendChild(coin);
-            setTimeout(()=>coin.remove(),40000);
-        }
-        // Spawn a few coins periodically
-        setInterval(spawnCoin,8000);
-        for(let i=0;i<3;i++) setTimeout(spawnCoin,i*2000);
+        // Floating coins (disabled)
 
         // Auto-init scroll reveal on DOM changes
         const mo = new MutationObserver(()=>{initSR();});
@@ -542,11 +470,7 @@
             if(btn){window._ripple(e);window._sparkle(btn);}
         });
 
-        // Add elastic wobble to glass cards on touch
-        document.addEventListener('touchstart', function(e){
-            const card = e.target.closest('.glass-card');
-            if(card){card.style.animation='none';card.offsetHeight;card.style.animation='elasticWobble .4s ease-out';}
-        },{passive:true});
+        // Elastic wobble on touch (disabled)
     })();
     </script>
 
@@ -1165,10 +1089,11 @@
                 if (!user) return;
                 const group = groups.find(g => g.id === id);
                 if (group && group.ownerId !== user.uid) { showToast("เฉพาะผู้สร้างเท่านั้นที่ลบได้ 🔒", "warning"); return; }
-                if (confirm("ต้องการลบกลุ่มและข้อมูลทั้งหมดถาวรหรือไม่?")) {
+                if (confirm("⚠️ ต้องการลบกลุ่มและข้อมูลทั้งหมดถาวรหรือไม่?\n\nข้อมูลจะไม่สามารถกู้คืนได้")) {
                     try {
                         if (isLocalMode) { LocalDB.deleteGroup(id); if (activeGroup?.id === id) { setActiveGroup(null); setView('list'); } }
                         else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(id).delete(); }
+                        showToast('ลบกลุ่มแล้ว 🗑️', 'info');
                     } catch (e) { handlePermissionError(e, "ลบกลุ่มไม่สำเร็จ"); }
                 }
             };
@@ -1200,22 +1125,27 @@
             };
 
             const addMember = async () => {
-                if (!user || !activeGroup || !newMemberName.trim() || (activeGroup.members||[]).includes(newMemberName.trim())) return;
+                if (!user || !activeGroup) return;
+                const name = newMemberName.trim();
+                if (!name) { showToast('กรุณาพิมพ์ชื่อสมาชิก ✏️', 'warning'); return; }
+                if ((activeGroup.members||[]).includes(name)) { showToast(`"${name}" มีในกลุ่มแล้ว 👀`, 'warning'); return; }
                 try {
-                    const newMembers = [...(activeGroup.members||[]), newMemberName.trim()];
+                    const newMembers = [...(activeGroup.members||[]), name];
                     if (isLocalMode) { LocalDB.saveGroup(activeGroup.id, { members: newMembers }); setActiveGroup(g => ({...g, members: newMembers})); }
-                    else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: firebase.firestore.FieldValue.arrayUnion(newMemberName.trim()) }); }
+                    else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: firebase.firestore.FieldValue.arrayUnion(name) }); }
                     setNewMemberName('');
+                    showToast(`เพิ่ม ${name} แล้ว 🎉`, 'success');
                 } catch (e) { handlePermissionError(e, "เพิ่มสมาชิกไม่สำเร็จ"); }
             };
 
             const removeMember = async (name) => {
                 if (!user || !activeGroup) return;
-                if (confirm(`ลบ ${name} ออกจากกลุ่ม?`)) {
+                if (confirm(`ลบ "${name}" ออกจากกลุ่ม?`)) {
                     try {
                         const newMembers = (activeGroup.members||[]).filter(m => m !== name);
                         if (isLocalMode) { LocalDB.saveGroup(activeGroup.id, { members: newMembers }); setActiveGroup(g => ({...g, members: newMembers})); }
                         else { await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('groups').doc(activeGroup.id).update({ members: firebase.firestore.FieldValue.arrayRemove(name) }); }
+                        showToast(`ลบ ${name} แล้ว`, 'info');
                     } catch (e) { handlePermissionError(e, "ลบสมาชิกไม่สำเร็จ"); }
                 }
             };
@@ -1276,8 +1206,11 @@
             const saveExpense = async () => {
                 if (!user || !activeGroup) return;
                 const amount = evaluateMath(expAmount);
-                if (!expDesc || amount <= 0 || !expPayer) return;
-                const data = { description: expDesc, amount, payer: expPayer, participants: expParticipants, date: editingExpense ? editingExpense.date : Date.now() };
+                if (!expDesc.trim()) { showToast('กรุณากรอกรายละเอียดบิล ✏️', 'warning'); return; }
+                if (amount <= 0) { showToast('กรุณากรอกจำนวนเงินที่ถูกต้อง 💰', 'warning'); return; }
+                if (!expPayer) { showToast('กรุณาเลือกคนจ่าย 👤', 'warning'); return; }
+                if (expParticipants.length === 0) { showToast('กรุณาเลือกคนที่ร่วมจ่ายอย่างน้อย 1 คน 👥', 'warning'); return; }
+                const data = { description: expDesc.trim(), amount, payer: expPayer, participants: expParticipants, date: editingExpense ? editingExpense.date : Date.now() };
                 try {
                     if (isLocalMode) {
                         if (editingExpense) LocalDB.saveExpense(activeGroup.id, editingExpense.id, data);
@@ -1487,7 +1420,7 @@
                                 </div>
                                 <h1 className="text-2xl font-bold mb-1 shimmer-title">ClearBill</h1>
                                 <p className="text-[11px] text-slate-400 font-bold tracking-[0.15em] mb-1 anim-up" style={{animationDelay:'0.3s'}}>SPLIT & GO</p>
-                                <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">แอปหารบิล จัดการค่าใช้จ่ายกลุ่ม<br/>Split &amp; Go ง่ายๆ ✨</p>
+                                <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium anim-up" style={{animationDelay:'0.4s'}}>แอปหารบิล จัดการค่าใช้จ่ายกลุ่ม<br/>ง่าย เร็ว จบในแอปเดียว ✨</p>
 
                                 {/* LOCAL MODE */}
                                 <div className="mb-3">
@@ -1545,7 +1478,7 @@
 
             // ── Main Render ────────────────────────────────────────────────────────
             return (
-                <div className="min-h-screen pb-16 page-enter">
+                <><div className="min-h-screen pb-16 page-enter">
                     {/* Header */}
                     <header className="p-3 sticky top-0 z-50" style={{animation:'slideDown .5s cubic-bezier(.22,1,.36,1) both'}}>
                         <div className="max-w-2xl mx-auto glass-card px-4 py-2.5 flex items-center justify-between shadow-md" style={{backdropFilter:'saturate(180%) blur(20px)'}}>
@@ -1962,6 +1895,7 @@
                         </div>
                     )}
                     </main>
+                </div>{/* end page-enter */}
 
                     {/* ─── MODAL: Claim Member (เลือกว่าคุณคือใครในกลุ่ม) ─────────── */}
                     {showClaimMember && claimGroupData && (
@@ -2385,7 +2319,7 @@
                             );
                         })()}
                     </div>
-                </div>
+                </>
             );
         }
 
